@@ -27,3 +27,7 @@ features = ["derive"]
 [dependencies.serenity]
 version = "0.11"
 features = ["chrono"]
+
+[dependencies.tokio]
+version = "1.21"
+features = ["full"]
