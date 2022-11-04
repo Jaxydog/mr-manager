@@ -15,7 +15,7 @@ publish = false
 
 [dependencies]
 colored = "2.0"
-rmp_serde = "1.1"
+rmp-serde = "1.1"
 
 [dependencies.chrono]
 version = "0.4"
