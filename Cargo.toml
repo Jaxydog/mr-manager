@@ -1,0 +1,30 @@
+[package]
+name = "mr-manager"
+description = "Open source guild management bot"
+keywords = ["discord", "bot", "management"]
+authors = ["Ethan Lynch"]
+
+readme = "README.md"
+license = "MIT"
+license-file = "LICENSE"
+repository = "https://github.com/Jaxydog/mr-manager/"
+
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+colored = "2.0"
+rmp_serde = "1.1"
+
+[dependencies.chrono]
+version = "0.4"
+features = ["serde"]
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.serenity]
+version = "0.11"
+features = ["chrono"]
