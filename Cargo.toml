@@ -6,7 +6,6 @@ authors = ["Ethan Lynch"]
 
 readme = "README.md"
 license = "MIT"
-license-file = "LICENSE"
 repository = "https://github.com/Jaxydog/mr-manager/"
 
 version = "0.1.0"
