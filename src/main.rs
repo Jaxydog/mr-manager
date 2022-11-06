@@ -6,7 +6,7 @@ use std::env;
 
 use event::Handler;
 use serenity::{prelude::GatewayIntents, Client};
-use utility::logger::Logger;
+use utility::{logger::Logger, storage::Storage};
 
 mod command;
 mod event;
@@ -40,7 +40,9 @@ async fn main() {
     let token = env::var(key).unwrap();
 
     let logger = Logger::new(enabled, store_logs).await.unwrap();
-    let handler = Handler::new(dev, logger);
+    let storage = Storage::new();
+    let handler = Handler::new(dev, logger, storage);
+
     let mut client = Client::builder(token, INTENTS)
         .event_handler(handler)
         .await

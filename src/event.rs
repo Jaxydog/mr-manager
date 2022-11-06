@@ -10,7 +10,7 @@ use serenity::{
 };
 
 use crate::{
-    utility::{logger::Logger, Error, Result},
+    utility::{logger::Logger, storage::Storage, Error, Result},
     DEV_GUILD_KEY,
 };
 
@@ -18,13 +18,15 @@ use crate::{
 pub struct Handler {
     is_dev: bool,
     logger: RwLock<Logger>,
+    storage: RwLock<Storage>,
 }
 
 impl Handler {
-    pub fn new(is_dev: bool, logger: Logger) -> Self {
+    pub fn new(is_dev: bool, logger: Logger, storage: Storage) -> Self {
         Self {
             is_dev,
             logger: RwLock::new(logger),
+            storage: RwLock::new(storage),
         }
     }
 
