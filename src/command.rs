@@ -6,13 +6,15 @@ use serenity::{
 
 use crate::{event::Handler, utility::Result};
 
+pub mod ping;
+
 #[async_trait]
 pub trait SlashCommand {
     fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand;
 
     async fn run(
         handler: &Handler,
-        context: &Context,
+        ctx: &Context,
         interaction: &ApplicationCommandInteraction,
     ) -> Result<()>;
 }

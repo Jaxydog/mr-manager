@@ -18,11 +18,9 @@ const DEV_GUILD_KEY: &str = "DEV_GUILD";
 
 const INTENTS: GatewayIntents = GatewayIntents::DIRECT_MESSAGES
     .union(GatewayIntents::GUILD_EMOJIS_AND_STICKERS)
-    .union(GatewayIntents::GUILD_INTEGRATIONS)
     .union(GatewayIntents::GUILD_MEMBERS)
     .union(GatewayIntents::GUILD_MESSAGE_REACTIONS)
     .union(GatewayIntents::GUILD_MESSAGES)
-    .union(GatewayIntents::GUILD_PRESENCES)
     .union(GatewayIntents::GUILD_SCHEDULED_EVENTS)
     .union(GatewayIntents::GUILDS);
 
@@ -32,7 +30,8 @@ async fn main() {
     dotenv::dotenv().unwrap();
     let args = env::args().collect::<Vec<_>>();
 
-    let dev = args.iter().any(|a| a == "--dev");
+    // prevents me from fucking myself over lol
+    let dev = true; // args.iter().any(|a| a == "--dev");
     let enabled = !args.iter().any(|a| a == "--no-log");
     let store_logs = !args.iter().any(|a| a == "--no-store");
 

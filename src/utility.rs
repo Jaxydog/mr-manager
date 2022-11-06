@@ -12,6 +12,7 @@ pub enum Error {
     Serenity(serenity::Error),
     Io(tokio::io::Error),
     InvalidRequest,
+    MissingCommand,
     MissingDevGuild,
     InvalidDevGuild,
 }
@@ -48,6 +49,7 @@ impl Display for Error {
             Self::Serenity(e) => return e.fmt(f),
             Self::Io(e) => return e.fmt(f),
             Self::InvalidRequest => "Invalid request configuration",
+            Self::MissingCommand => "The received command is not registered",
             Self::MissingDevGuild => "Missing development guild identifier",
             Self::InvalidDevGuild => "Invalid development guild identifier",
         };
