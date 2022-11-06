@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use chrono::Utc;
+
 pub mod logger;
 pub mod storage;
 
@@ -11,10 +13,12 @@ pub enum Error {
     RustMPEncode(rmp_serde::encode::Error),
     Serenity(serenity::Error),
     Io(tokio::io::Error),
+    InvalidCommandData,
+    InvalidDevGuild,
     InvalidRequest,
     MissingCommand,
+    MissingCommandData,
     MissingDevGuild,
-    InvalidDevGuild,
 }
 
 impl From<rmp_serde::decode::Error> for Error {
@@ -48,12 +52,20 @@ impl Display for Error {
             Self::RustMPEncode(e) => return e.fmt(f),
             Self::Serenity(e) => return e.fmt(f),
             Self::Io(e) => return e.fmt(f),
+            Self::InvalidCommandData => "The received command is contains invalid data",
+            Self::InvalidDevGuild => "Invalid development guild identifier",
             Self::InvalidRequest => "Invalid request configuration",
             Self::MissingCommand => "The received command is not registered",
+            Self::MissingCommandData => "The received command is missing data",
             Self::MissingDevGuild => "Missing development guild identifier",
-            Self::InvalidDevGuild => "Invalid development guild identifier",
         };
 
         write!(f, "{message}")
     }
+}
+
+pub fn to_unix_str(millis: i64, flag: &str) -> String {
+    let time = Utc::now().timestamp_millis() + millis;
+    let trimmed = time / 1000;
+    format!("<t:{trimmed}:{flag}>")
 }
