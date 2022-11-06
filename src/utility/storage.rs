@@ -46,9 +46,7 @@ impl Request {
         PathBuf::from(DATA_DIR).join(&self.dir)
     }
     pub fn full_path(&self) -> PathBuf {
-        self.full_dir()
-            .with_file_name(&self.key)
-            .with_extension(FILE_EXT)
+        self.full_dir().join(&self.key).with_extension(FILE_EXT)
     }
 }
 
