@@ -5,7 +5,7 @@
 use std::env;
 
 use event::Handler;
-use serenity::{prelude::GatewayIntents, Client};
+use serenity::{prelude::GatewayIntents, utils::Color, Client};
 use utility::{logger::Logger, storage::Storage};
 
 mod command;
@@ -15,6 +15,7 @@ mod utility;
 const TOKEN_KEY: &str = "TOKEN";
 const DEV_TOKEN_KEY: &str = "DEV_TOKEN";
 const DEV_GUILD_KEY: &str = "DEV_GUILD";
+const DEFAULT_COLOR: Color = Color::from_rgb(172, 90, 110);
 
 const INTENTS: GatewayIntents = GatewayIntents::DIRECT_MESSAGES
     .union(GatewayIntents::GUILD_EMOJIS_AND_STICKERS)

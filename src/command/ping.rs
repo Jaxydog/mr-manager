@@ -8,10 +8,9 @@ use serenity::{
         Permissions,
     },
     prelude::Context,
-    utils::Color,
 };
 
-use crate::{event::Handler, utility::Result};
+use crate::{event::Handler, utility::Result, DEFAULT_COLOR};
 
 use super::SlashCommand;
 
@@ -32,7 +31,7 @@ impl SlashCommand for Ping {
         interaction: &ApplicationCommandInteraction,
     ) -> Result<()> {
         let mut embed = CreateEmbed::default();
-        embed.color(Color::DARK_RED).title("Calculating...");
+        embed.color(DEFAULT_COLOR).title("Calculating...");
 
         interaction
             .create_interaction_response(&ctx.http, |res| {
