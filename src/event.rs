@@ -63,7 +63,8 @@ impl Handler {
 
         Ok(guild
             .set_application_commands(&ctx.http, |cmd| {
-                cmd.create_application_command(|c| command::offer::Offer::register(c))
+                cmd.create_application_command(|c| command::embed::Embed::register(c))
+                    .create_application_command(|c| command::offer::Offer::register(c))
                     .create_application_command(|c| command::ping::Ping::register(c))
             })
             .await?
@@ -113,6 +114,7 @@ impl EventHandler for Handler {
             self.info(info).await.ok();
 
             let result = match command.data.name.as_str() {
+                "embed" => command::embed::Embed::run(self, &ctx, &command).await,
                 "offer" => command::offer::Offer::run(self, &ctx, &command).await,
                 "ping" => command::ping::Ping::run(self, &ctx, &command).await,
                 _ => Err(Error::MissingCommand),

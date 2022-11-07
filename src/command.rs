@@ -12,6 +12,7 @@ use crate::{
     utility::{Error, Result},
 };
 
+pub mod embed;
 pub mod offer;
 pub mod ping;
 
