@@ -17,7 +17,7 @@ use serenity::{
 
 use crate::{event::Handler, utility::Result, DEFAULT_COLOR};
 
-use super::{get_data, SlashCommand};
+use super::{data, SlashCommand};
 
 pub struct Embed;
 
@@ -134,59 +134,73 @@ impl SlashCommand for Embed {
         interaction: &ApplicationCommandInteraction,
     ) -> Result<()> {
         let mut embed = CreateEmbed::default();
+        let options = &interaction.data.options;
+        let mut is_valid = false;
 
-        if let Some(CommandDataOptionValue::String(name)) = get_data(interaction, 1) {
+        if let Ok(CommandDataOptionValue::String(name)) = data(options, "author_name") {
             embed.author(|author| {
-                if let Some(CommandDataOptionValue::String(icon_url)) = get_data(interaction, 0) {
+                if let Ok(CommandDataOptionValue::String(icon_url)) = data(options, "author_icon") {
                     author.icon_url(icon_url);
                 }
-                if let Some(CommandDataOptionValue::String(url)) = get_data(interaction, 2) {
+                if let Ok(CommandDataOptionValue::String(url)) = data(options, "author_url") {
                     author.url(url);
                 }
+
+                is_valid = true;
                 author.name(name)
             });
         }
 
-        if let Some(CommandDataOptionValue::String(hex)) = get_data(interaction, 3) {
-            if let Ok(value) = hex.parse::<u64>() {
+        if let Ok(CommandDataOptionValue::String(hex)) = data(options, "color") {
+            if let Ok(value) = u64::from_str_radix(hex, 16) {
                 embed.color(value);
             }
         }
 
-        if let Some(CommandDataOptionValue::String(description)) = get_data(interaction, 4) {
+        if let Ok(CommandDataOptionValue::String(description)) = data(options, "description") {
+            is_valid = true;
             embed.description(description);
         }
 
-        if let Some(CommandDataOptionValue::String(text)) = get_data(interaction, 6) {
+        if let Ok(CommandDataOptionValue::String(text)) = data(options, "footer_text") {
             embed.footer(|footer| {
-                if let Some(CommandDataOptionValue::String(icon_url)) = get_data(interaction, 5) {
+                if let Ok(CommandDataOptionValue::String(icon_url)) = data(options, "footer_icon") {
                     footer.icon_url(icon_url);
                 }
 
+                is_valid = true;
                 footer.text(text)
             });
         }
 
-        if let Some(CommandDataOptionValue::String(image)) = get_data(interaction, 7) {
+        if let Ok(CommandDataOptionValue::String(image)) = data(options, "image") {
+            is_valid = true;
             embed.image(image);
         }
 
-        if let Some(CommandDataOptionValue::String(thumbnail)) = get_data(interaction, 8) {
+        if let Ok(CommandDataOptionValue::String(thumbnail)) = data(options, "thumbnail") {
+            is_valid = true;
             embed.thumbnail(thumbnail);
         }
 
-        if let Some(CommandDataOptionValue::String(title)) = get_data(interaction, 9) {
+        if let Ok(CommandDataOptionValue::String(title)) = data(options, "title") {
+            is_valid = true;
             embed.title(title);
         }
 
-        if let Some(CommandDataOptionValue::String(url)) = get_data(interaction, 10) {
+        if let Ok(CommandDataOptionValue::String(url)) = data(options, "url") {
             embed.url(url);
         }
 
-        let ephemeral = match get_data(interaction, 11) {
-            Some(CommandDataOptionValue::Boolean(b)) => *b,
-            _ => false,
+        let ephemeral = match data(options, "ephemeral") {
+            Ok(CommandDataOptionValue::Boolean(b)) => !is_valid || *b,
+            _ => !is_valid,
         };
+
+        if !is_valid {
+            embed = CreateEmbed::default();
+            embed.color(DEFAULT_COLOR).title("Invalid parameters!");
+        }
 
         interaction
             .create_interaction_response(&ctx.http, |res| {

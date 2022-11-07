@@ -20,7 +20,7 @@ use crate::{
     DEFAULT_COLOR,
 };
 
-use super::{get_required_data, SlashCommand};
+use super::{data, SlashCommand};
 
 pub struct Offer;
 
@@ -65,15 +65,17 @@ impl SlashCommand for Offer {
         ctx: &Context,
         interaction: &ApplicationCommandInteraction,
     ) -> Result<()> {
-        let give = match get_required_data(interaction, 0)? {
+        let options = &interaction.data.options;
+
+        let give = match data(options, "give")? {
             CommandDataOptionValue::String(s) => Ok(s),
             _ => Err(Error::InvalidCommandData),
         }?;
-        let want = match get_required_data(interaction, 1)? {
+        let want = match data(options, "want")? {
             CommandDataOptionValue::String(s) => Ok(s),
             _ => Err(Error::InvalidCommandData),
         }?;
-        let time = *match get_required_data(interaction, 2)? {
+        let time = *match data(options, "time")? {
             CommandDataOptionValue::Integer(i) => Ok(i),
             _ => Err(Error::InvalidCommandData),
         }?;

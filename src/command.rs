@@ -2,7 +2,7 @@ use serenity::{
     async_trait,
     builder::CreateApplicationCommand,
     model::prelude::interaction::application_command::{
-        ApplicationCommandInteraction, CommandDataOptionValue,
+        ApplicationCommandInteraction, CommandDataOption, CommandDataOptionValue,
     },
     prelude::Context,
 };
@@ -27,22 +27,13 @@ pub trait SlashCommand {
     ) -> Result<()>;
 }
 
-pub fn get_required_data(
-    interaction: &ApplicationCommandInteraction,
-    index: usize,
-) -> Result<&CommandDataOptionValue> {
-    interaction
-        .data
-        .options
-        .get(index)
-        .ok_or(Error::MissingCommandData)?
-        .resolved
-        .as_ref()
+pub fn data<'cmd>(
+    options: &'cmd [CommandDataOption],
+    name: &'static str,
+) -> Result<&'cmd CommandDataOptionValue> {
+    options
+        .iter()
+        .find(|data| data.name == name)
+        .and_then(|v| v.resolved.as_ref())
         .ok_or(Error::MissingCommandData)
-}
-pub fn get_data(
-    interaction: &ApplicationCommandInteraction,
-    index: usize,
-) -> Option<&CommandDataOptionValue> {
-    interaction.data.options.get(index)?.resolved.as_ref()
 }
