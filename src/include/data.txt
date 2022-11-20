@@ -15,4 +15,5 @@ Any data under this category is stored entirely for the purpose of server modera
 
 -----
 
-Stored data will __never__ be shared with a third party. MrManager is made entirely for fun and there are no wishes to profit off of it. For any concerns, you may contact <@206260650010345483> directly.
+Stored data will __never__ be shared with a third party. MrManager is made entirely for fun and there are no wishes to profit off of it.
+For any concerns, you may contact <@206260650010345483> directly.

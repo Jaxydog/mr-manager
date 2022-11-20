@@ -7,7 +7,7 @@ use serenity::{
         prelude::{command::CommandOptionType, CommandInteraction},
         Permissions,
     },
-    prelude::Context,
+    prelude::{CacheHttp, Context},
 };
 
 use crate::{
@@ -60,6 +60,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+    let user = ctx.http().get_user(cmd.user.id).await?;
     let opts = &cmd.data.options();
 
     let give = get_str(opts, GIVE_NAME)?;
@@ -68,8 +69,8 @@ pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
     let time = to_unix_str(mins * 60 * 1000, "R");
 
     let embed = CreateEmbed::new()
-        .author(CreateEmbedAuthor::new(cmd.user.tag()).icon_url(cmd.user.face()))
-        .color(cmd.user.accent_colour.unwrap_or(DEFAULT_COLOR))
+        .author(CreateEmbedAuthor::new(user.tag()).icon_url(user.face()))
+        .color(user.accent_colour.unwrap_or(DEFAULT_COLOR))
         .description(format!("**Offer expires:** {time}"))
         .field("Offer", give, false)
         .field("Price", want, false)

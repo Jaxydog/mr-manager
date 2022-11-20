@@ -28,12 +28,17 @@ fn stringify(cmd: &Command) -> String {
 pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
     let user = ctx.http.get_current_user().await?;
     let mut commands = ctx.http.get_global_application_commands().await?;
-    commands.sort_by_key(|c| c.name.clone());
 
     let mut description = include_str!(r"..\include\help\start.txt").to_string();
 
-    for listing in commands.iter().map(stringify) {
-        description.push_str(&listing);
+    if commands.is_empty() {
+        description.push_str("\n*No global commands found...*\n");
+    } else {
+        commands.sort_by_key(|c| c.name.clone());
+
+        for listing in commands.iter().map(stringify) {
+            description.push_str(&listing);
+        }
     }
 
     description.push_str(include_str!(r"..\include\help\end.txt"));
