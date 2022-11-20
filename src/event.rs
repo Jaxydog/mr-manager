@@ -54,6 +54,7 @@ impl Handler {
     fn get_command_list() -> Vec<CreateCommand> {
         vec![
             command::embed::register(),
+            command::help::register(),
             command::offer::register(),
             command::ping::register(),
         ]
@@ -125,6 +126,7 @@ impl EventHandler for Handler {
 
             let result = match cmd.data.name.as_str() {
                 command::embed::NAME => command::embed::run(&ctx, &cmd).await,
+                command::help::NAME => command::help::run(&ctx, &cmd).await,
                 command::offer::NAME => command::offer::run(&ctx, &cmd).await,
                 command::ping::NAME => command::ping::run(&ctx, &cmd).await,
                 _ => Err(Error::MissingCommand),

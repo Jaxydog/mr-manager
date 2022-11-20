@@ -11,6 +11,7 @@ use crate::utility::{Error, Result};
 #[allow(clippy::use_self)]
 pub mod apply;
 pub mod embed;
+pub mod help;
 pub mod offer;
 pub mod ping;
 #[allow(clippy::use_self)]
