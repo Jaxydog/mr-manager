@@ -8,7 +8,7 @@ use serenity::{
         prelude::{interaction::Interaction, GuildId, Presence, Ready},
         user::OnlineStatus,
     },
-    prelude::{Context, EventHandler, RwLock},
+    prelude::{CacheHttp, Context, EventHandler, RwLock},
 };
 use tokio::sync::RwLockWriteGuard;
 
@@ -60,17 +60,26 @@ impl Handler {
             command::ping::register(),
         ]
     }
-    pub fn update_presence(&self, ctx: &Context) {
-        let status = OnlineStatus::DoNotDisturb;
+
+    pub async fn update_presence(&self, ctx: &Context) {
+        let status = if self.is_dev {
+            OnlineStatus::Idle
+        } else {
+            OnlineStatus::DoNotDisturb
+        };
         let activity = if self.is_dev {
             ActivityData::listening("API events")
         } else {
             ActivityData::watching("my employees")
         };
 
+        let name = format!("{status:?}");
+        let text = format!("{:?}, {}", activity.kind, &activity.name);
+        self.info(format!("Presence updated: {name}; {text}")).await;
+
         ctx.set_presence(Some(activity), status);
     }
-    pub async fn register_guild_commands(&self, ctx: &Context) -> Result<usize> {
+    pub async fn update_guild_commands(&self, ctx: &Context) -> Result<usize> {
         let raw = env::var(DEV_GUILD_KEY).map_err(|_| Error::MissingDevGuild)?;
         let guild = GuildId(
             raw.parse::<NonZeroU64>()
@@ -78,69 +87,66 @@ impl Handler {
         );
 
         Ok(guild
-            .set_application_commands(&ctx.http, Self::get_command_list())
+            .set_application_commands(ctx.http(), Self::get_command_list())
             .await?
             .len())
+    }
+    pub async fn update_global_commands(&self, ctx: &Context) -> Result<usize> {
+        if self.is_dev {
+            Ok(ctx.http().get_global_application_commands().await?.len())
+        } else {
+            Ok(ctx
+                .http()
+                .create_global_application_commands(&Self::get_command_list())
+                .await?
+                .len())
+        }
     }
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        let cheer = format!("Connected to the API: {}", ready.user.tag());
-        self.info(cheer).await;
+        self.info(format!("Connected: {}", ready.user.tag())).await;
 
-        if let Some(info) = ready.shard {
-            let shards = format!("Sharding enabled: {} total", info.total);
-            self.info(shards).await;
+        if let Some(n) = ready.shard.map(|s| s.total) {
+            self.info(format!("Shard count: {n}")).await;
         }
 
-        self.update_presence(&ctx);
+        self.update_presence(&ctx).await;
 
-        match self.register_guild_commands(&ctx).await {
-            Ok(count) => {
-                let text = format!("Commands registered: {count} (guild)");
-                self.info(text).await;
-            }
-            Err(reason) => {
-                let error = format!("Command registration failed: {reason}");
-                self.warn(error).await;
-            }
+        match self.update_guild_commands(&ctx).await {
+            Ok(n) => self.info(format!("Guild commands: {n}")).await,
+            Err(e) => self.warn(format!("Guild update failed: {e}")).await,
+        };
+
+        match self.update_global_commands(&ctx).await {
+            Ok(n) => self.info(format!("Global commands: {n}")).await,
+            Err(e) => self.warn(format!("Global update failed: {e}")).await,
         };
     }
 
-    async fn presence_update(&self, _: Context, presence: Presence) {
-        let status = presence.status.name();
-        let activity = presence.activities.first().map_or(String::default(), |a| {
-            let text = a.details.as_ref().map(String::clone).unwrap_or_default();
-            format!("{:?} {text}", a.kind)
-        });
-
-        let text = format!("Presence updated: {status}, {activity}");
-        self.info(text).await;
-    }
-
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(cmd) = interaction {
-            let info = format!("Command received: {}", cmd.data.name);
-            self.info(info).await;
+        let name = format!("{:?}#{}", interaction.kind(), interaction.id());
+        self.info(format!("Interaction received: {name}")).await;
 
-            let result = match cmd.data.name.as_str() {
+        let result = match interaction {
+            Interaction::Command(cmd) => match cmd.data.name.as_str() {
                 command::data::NAME => command::data::run(&ctx, &cmd).await,
                 command::embed::NAME => command::embed::run(&ctx, &cmd).await,
                 command::help::NAME => command::help::run(&ctx, &cmd).await,
                 command::offer::NAME => command::offer::run(&ctx, &cmd).await,
                 command::ping::NAME => command::ping::run(&ctx, &cmd).await,
                 _ => Err(Error::MissingCommand),
-            };
+            },
+            _ => Err(Error::MissingInteraction),
+        };
 
-            if let Err(reason) = result {
-                let text = format!("Command failed: {}, {reason}", cmd.data.name);
-                self.error(text).await;
-            } else {
-                let text = format!("Executed command: {}", cmd.data.name);
-                self.info(text).await;
-            }
+        if let Err(reason) = result {
+            self.error(format!("Interaction failed: {name} {reason}"))
+                .await;
+        } else {
+            self.info(format!("Interaction succeeded: {name}")).await;
         }
     }
 }

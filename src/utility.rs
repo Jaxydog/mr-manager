@@ -3,6 +3,7 @@ use std::fmt::Display;
 use chrono::Utc;
 
 pub mod logger;
+#[allow(dead_code)]
 pub mod storage;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -18,6 +19,7 @@ pub enum Error {
     InvalidRequest,
     MissingCommand,
     MissingCommandData,
+    MissingInteraction,
     MissingDevGuild,
     Other(String),
 }
@@ -64,6 +66,7 @@ impl Display for Error {
             Self::InvalidRequest => "Invalid request configuration",
             Self::MissingCommand => "The received command is not registered",
             Self::MissingCommandData => "The received command is missing data",
+            Self::MissingInteraction => "The received interaction is not handled",
             Self::MissingDevGuild => "Missing development guild identifier",
             Self::Other(s) => s,
         };
