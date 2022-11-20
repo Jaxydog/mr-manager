@@ -7,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use tokio::{
-    fs::{create_dir_all, remove_file, File},
+    fs::{create_dir_all, read_to_string, remove_file, File},
     io::AsyncWriteExt,
 };
 
@@ -356,5 +356,34 @@ impl Storage {
         }
 
         Ok(())
+    }
+}
+
+pub async fn get_temp(request: &Request) -> Result<String> {
+    if request.use_files {
+        Ok(read_to_string(request.full_path()).await?)
+    } else {
+        Err(Error::InvalidRequest)
+    }
+}
+
+pub async fn insert_temp(request: &Request, data: &str) -> Result<()> {
+    if request.use_files {
+        create_dir_all(&request.full_dir()).await?;
+
+        let path = request.full_path().with_extension("txt");
+        let mut file = File::create(&path).await?;
+        file.write_all(data.as_bytes()).await.map_err(Error::from)
+    } else {
+        Err(Error::InvalidRequest)
+    }
+}
+
+pub async fn remove_temp(request: &Request) -> Result<()> {
+    if request.use_files {
+        let path = request.full_path().with_extension("txt");
+        remove_file(path).await.map_err(Error::from)
+    } else {
+        Err(Error::InvalidRequest)
     }
 }
