@@ -1,106 +1,85 @@
 use serenity::{
-    async_trait,
-    builder::{CreateApplicationCommand, CreateEmbed},
+    builder::{
+        CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedAuthor,
+        CreateInteractionResponse, CreateInteractionResponseMessage,
+    },
     model::{
-        prelude::{
-            command::CommandOptionType,
-            interaction::{
-                application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
-                InteractionResponseType,
-            },
-        },
+        prelude::{command::CommandOptionType, CommandInteraction},
         Permissions,
     },
     prelude::Context,
 };
 
 use crate::{
-    event::Handler,
-    utility::{to_unix_str, Error, Result},
+    utility::{to_unix_str, Result},
     DEFAULT_COLOR,
 };
 
-use super::{data, SlashCommand};
+use super::{get_i64, get_str};
 
-pub struct Offer;
+pub const NAME: &str = "offer";
+pub const GIVE_NAME: &str = "give";
+pub const WANT_NAME: &str = "want";
+pub const TIME_NAME: &str = "time";
 
-#[async_trait]
-impl SlashCommand for Offer {
-    fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-        command
-            .name("offer")
-            .description("Creates a trade offer")
-            .default_member_permissions(Permissions::SEND_MESSAGES)
-            .dm_permission(false)
-            .create_option(|option| {
-                option
-                    .name("give")
-                    .description("What are you giving away?")
-                    .kind(CommandOptionType::String)
-                    .max_length(256)
-                    .min_length(1)
-                    .required(true)
-            })
-            .create_option(|option| {
-                option
-                    .name("want")
-                    .description("What do you want in return?")
-                    .kind(CommandOptionType::String)
-                    .max_length(256)
-                    .min_length(1)
-                    .required(true)
-            })
-            .create_option(|option| {
-                option
-                    .name("time")
-                    .description("For how long is this offer valid (minutes)?")
-                    .kind(CommandOptionType::Integer)
-                    .max_int_value(14400)
-                    .min_int_value(5)
-                    .required(true)
-            })
-    }
-    async fn run(
-        _: &Handler,
-        ctx: &Context,
-        interaction: &ApplicationCommandInteraction,
-    ) -> Result<()> {
-        let options = &interaction.data.options;
+pub fn register() -> CreateCommand {
+    CreateCommand::new(NAME)
+        .description("Creates a trade offer")
+        .default_member_permissions(Permissions::SEND_MESSAGES)
+        .dm_permission(false)
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                GIVE_NAME,
+                "What are you giving away?",
+            )
+            .max_length(256)
+            .clone()
+            .required(true),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                WANT_NAME,
+                "What do you want in return?",
+            )
+            .max_length(256)
+            .clone()
+            .required(true),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                TIME_NAME,
+                "For how long is this offer valid (in minutes)?",
+            )
+            .max_int_value(14400)
+            .min_int_value(5)
+            .required(true),
+        )
+}
 
-        let give = match data(options, "give")? {
-            CommandDataOptionValue::String(s) => Ok(s),
-            _ => Err(Error::InvalidCommandData),
-        }?;
-        let want = match data(options, "want")? {
-            CommandDataOptionValue::String(s) => Ok(s),
-            _ => Err(Error::InvalidCommandData),
-        }?;
-        let time = *match data(options, "time")? {
-            CommandDataOptionValue::Integer(i) => Ok(i),
-            _ => Err(Error::InvalidCommandData),
-        }?;
-        let time_str = to_unix_str(time * 60 * 1000, "R");
+pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+    let opts = &cmd.data.options();
 
-        let mut embed = CreateEmbed::default();
-        embed
-            .author(|author| {
-                author
-                    .icon_url(interaction.user.face())
-                    .name(interaction.user.tag())
-            })
-            .color(DEFAULT_COLOR)
-            .description(format!("**Offer expires:** {time_str}"))
-            .field("Offer", give, false)
-            .field("Price", want, false)
-            .thumbnail(interaction.user.face());
+    let give = get_str(opts, GIVE_NAME)?;
+    let want = get_str(opts, WANT_NAME)?;
+    let mins = get_i64(opts, TIME_NAME)?;
+    let time = to_unix_str(mins * 60 * 1000, "R");
 
-        interaction
-            .create_interaction_response(&ctx.http, |res| {
-                res.kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|data| data.add_embed(embed))
-            })
-            .await?;
+    let embed = CreateEmbed::new()
+        .author(CreateEmbedAuthor::new(cmd.user.tag()).icon_url(cmd.user.face()))
+        .color(cmd.user.accent_colour.unwrap_or(DEFAULT_COLOR))
+        .description(format!("**Offer expires:** {time}"))
+        .field("Offer", give, false)
+        .field("Price", want, false)
+        .thumbnail(cmd.user.face());
 
-        Ok(())
-    }
+    cmd.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().embed(embed)),
+    )
+    .await?;
+
+    Ok(())
 }

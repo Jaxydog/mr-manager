@@ -1,56 +1,47 @@
 use serenity::{
-    async_trait,
-    builder::{CreateApplicationCommand, CreateEmbed},
-    model::{
-        prelude::interaction::{
-            application_command::ApplicationCommandInteraction, InteractionResponseType,
-        },
-        Permissions,
+    builder::{
+        CreateCommand, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
+        EditInteractionResponse,
     },
+    model::{prelude::CommandInteraction, Permissions},
     prelude::Context,
 };
 
-use crate::{event::Handler, utility::Result, DEFAULT_COLOR};
+use crate::{utility::Result, DEFAULT_COLOR};
 
-use super::SlashCommand;
+pub const NAME: &str = "ping";
 
-pub struct Ping;
+pub fn register() -> CreateCommand {
+    CreateCommand::new(NAME)
+        .description("Tests the bot's API connection")
+        .default_member_permissions(Permissions::USE_APPLICATION_COMMANDS)
+        .dm_permission(true)
+}
 
-#[async_trait]
-impl SlashCommand for Ping {
-    fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-        command
-            .name("ping")
-            .description("Tests the bot's API connection")
-            .default_member_permissions(Permissions::USE_SLASH_COMMANDS)
-            .dm_permission(true)
-    }
-    async fn run(
-        _: &Handler,
-        ctx: &Context,
-        interaction: &ApplicationCommandInteraction,
-    ) -> Result<()> {
-        let mut embed = CreateEmbed::default();
-        embed.color(DEFAULT_COLOR).title("Calculating...");
+pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+    let mut embed = CreateEmbed::new()
+        .color(DEFAULT_COLOR)
+        .title("Calculating...");
 
-        interaction
-            .create_interaction_response(&ctx.http, |res| {
-                res.kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|msg| msg.add_embed(embed.clone()).ephemeral(true))
-            })
-            .await?;
+    cmd.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .embed(embed.clone())
+                .ephemeral(true),
+        ),
+    )
+    .await?;
 
-        let response = interaction.get_interaction_response(&ctx.http).await?;
-        let sent = response.id.created_at().timestamp_millis();
-        let created = interaction.id.created_at().timestamp_millis();
-        let delay = sent - created;
+    let response = cmd.get_response(&ctx.http).await?;
+    let sent = response.id.created_at().timestamp_millis();
+    let received = cmd.id.created_at().timestamp_millis();
+    let delay = sent - received;
 
-        embed.title(format!("Pong! ({delay}ms)"));
+    embed = embed.title(format!("Pong! ({delay}ms)"));
 
-        interaction
-            .edit_original_interaction_response(&ctx.http, |edit| edit.set_embed(embed))
-            .await?;
+    cmd.edit_response(&ctx.http, EditInteractionResponse::new().embed(embed))
+        .await?;
 
-        Ok(())
-    }
+    Ok(())
 }

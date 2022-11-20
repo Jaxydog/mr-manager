@@ -19,6 +19,7 @@ pub enum Error {
     MissingCommand,
     MissingCommandData,
     MissingDevGuild,
+    Other(String),
 }
 
 impl From<rmp_serde::decode::Error> for Error {
@@ -45,6 +46,12 @@ impl From<tokio::io::Error> for Error {
     }
 }
 
+impl From<String> for Error {
+    fn from(string: String) -> Self {
+        Self::Other(string)
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
@@ -58,6 +65,7 @@ impl Display for Error {
             Self::MissingCommand => "The received command is not registered",
             Self::MissingCommandData => "The received command is missing data",
             Self::MissingDevGuild => "Missing development guild identifier",
+            Self::Other(s) => s,
         };
 
         write!(f, "{message}")

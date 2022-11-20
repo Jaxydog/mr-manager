@@ -4,10 +4,12 @@
 
 use std::env;
 
+use dotenvy::dotenv;
 use event::Handler;
-use serenity::{prelude::GatewayIntents, utils::Color, Client};
+use serenity::{model::Color, prelude::GatewayIntents, Client};
 use utility::{logger::Logger, storage::Storage};
 
+#[allow(dead_code)]
 mod command;
 mod event;
 mod utility;
@@ -28,7 +30,7 @@ const INTENTS: GatewayIntents = GatewayIntents::DIRECT_MESSAGES
 #[allow(clippy::unwrap_used)]
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().unwrap();
+    dotenv().unwrap();
     let args = env::args().collect::<Vec<_>>();
 
     // prevents me from fucking myself over lol

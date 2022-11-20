@@ -1,9 +1,11 @@
-use std::{env, io};
+use std::{env, io, num::NonZeroU64};
 
 use serenity::{
     async_trait,
+    builder::CreateCommand,
+    gateway::ActivityData,
     model::{
-        prelude::{interaction::Interaction, Activity, GuildId, Presence, Ready},
+        prelude::{interaction::Interaction, GuildId, Presence, Ready},
         user::OnlineStatus,
     },
     prelude::{Context, EventHandler, RwLock},
@@ -11,7 +13,7 @@ use serenity::{
 use tokio::sync::RwLockWriteGuard;
 
 use crate::{
-    command::{self, SlashCommand},
+    command,
     utility::{logger::Logger, storage::Storage, Error, Result},
     DEV_GUILD_KEY,
 };
@@ -32,41 +34,49 @@ impl Handler {
         }
     }
 
+    #[inline]
     pub async fn info<T: ToString + Send + Sync>(&self, v: T) -> io::Result<()> {
         self.logger.write().await.info(v).await
     }
+    #[inline]
     pub async fn warn<T: ToString + Send + Sync>(&self, v: T) -> io::Result<()> {
         self.logger.write().await.warn(v).await
     }
+    #[inline]
     pub async fn error<T: ToString + Send + Sync>(&self, v: T) -> io::Result<()> {
         self.logger.write().await.error(v).await
     }
-
+    #[inline]
     pub async fn storage(&self) -> RwLockWriteGuard<Storage> {
         self.storage.write().await
     }
 
-    pub async fn update_presence(&self, ctx: &Context) {
+    fn get_command_list() -> Vec<CreateCommand> {
+        vec![
+            command::embed::register(),
+            command::offer::register(),
+            command::ping::register(),
+        ]
+    }
+    pub fn update_presence(&self, ctx: &Context) {
         let status = OnlineStatus::DoNotDisturb;
         let activity = if self.is_dev {
-            Activity::listening("API events")
+            ActivityData::listening("API events")
         } else {
-            Activity::watching("my employees")
+            ActivityData::watching("my employees")
         };
 
-        ctx.set_presence(Some(activity), status).await;
+        ctx.set_presence(Some(activity), status);
     }
     pub async fn register_guild_commands(&self, ctx: &Context) -> Result<usize> {
         let raw = env::var(DEV_GUILD_KEY).map_err(|_| Error::MissingDevGuild)?;
-        let snowflake = raw.parse::<u64>().map_err(|_| Error::InvalidDevGuild)?;
-        let guild = GuildId(snowflake);
+        let guild = GuildId(
+            raw.parse::<NonZeroU64>()
+                .map_err(|_| Error::InvalidDevGuild)?,
+        );
 
         Ok(guild
-            .set_application_commands(&ctx.http, |cmd| {
-                cmd.create_application_command(|c| command::embed::Embed::register(c))
-                    .create_application_command(|c| command::offer::Offer::register(c))
-                    .create_application_command(|c| command::ping::Ping::register(c))
-            })
+            .set_application_commands(&ctx.http, Self::get_command_list())
             .await?
             .len())
     }
@@ -78,12 +88,12 @@ impl EventHandler for Handler {
         let cheer = format!("Connected to the API: {}", ready.user.tag());
         self.info(cheer).await.ok();
 
-        if let Some([_, total]) = ready.shard {
-            let shards = format!("Sharding enabled: {total} total");
+        if let Some(info) = ready.shard {
+            let shards = format!("Sharding enabled: {} total", info.total);
             self.info(shards).await.ok();
         }
 
-        self.update_presence(&ctx).await;
+        self.update_presence(&ctx);
 
         match self.register_guild_commands(&ctx).await {
             Ok(count) => {
@@ -109,22 +119,22 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
-            let info = format!("Command received: {}", command.data.name);
+        if let Interaction::Command(cmd) = interaction {
+            let info = format!("Command received: {}", cmd.data.name);
             self.info(info).await.ok();
 
-            let result = match command.data.name.as_str() {
-                "embed" => command::embed::Embed::run(self, &ctx, &command).await,
-                "offer" => command::offer::Offer::run(self, &ctx, &command).await,
-                "ping" => command::ping::Ping::run(self, &ctx, &command).await,
+            let result = match cmd.data.name.as_str() {
+                command::embed::NAME => command::embed::run(&ctx, &cmd).await,
+                command::offer::NAME => command::offer::run(&ctx, &cmd).await,
+                command::ping::NAME => command::ping::run(&ctx, &cmd).await,
                 _ => Err(Error::MissingCommand),
             };
 
             if let Err(reason) = result {
-                let text = format!("Command failed: {}, {reason}", command.data.name);
+                let text = format!("Command failed: {}, {reason}", cmd.data.name);
                 self.error(text).await.ok();
             } else {
-                let text = format!("Executed command: {}", command.data.name);
+                let text = format!("Executed command: {}", cmd.data.name);
                 self.info(text).await.ok();
             }
         }
