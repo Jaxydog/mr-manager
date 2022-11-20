@@ -5,7 +5,7 @@ use serenity::{
     builder::CreateCommand,
     gateway::ActivityData,
     model::{
-        prelude::{interaction::Interaction, GuildId, Presence, Ready},
+        prelude::{interaction::Interaction, GuildId, Ready},
         user::OnlineStatus,
     },
     prelude::{CacheHttp, Context, EventHandler, RwLock},

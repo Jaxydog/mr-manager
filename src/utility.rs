@@ -3,7 +3,6 @@ use std::fmt::Display;
 use chrono::Utc;
 
 pub mod logger;
-#[allow(dead_code)]
 pub mod storage;
 
 pub type Result<T> = std::result::Result<T, Error>;

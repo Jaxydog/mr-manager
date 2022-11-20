@@ -1,6 +1,6 @@
 #![deny(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 #![warn(clippy::nursery, clippy::pedantic, clippy::todo, clippy::unimplemented)]
-#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::module_name_repetitions, dead_code)]
 
 use std::env;
 
