@@ -1,4 +1,4 @@
-use std::{env, io, num::NonZeroU64};
+use std::{env, num::NonZeroU64};
 
 use serenity::{
     async_trait,
@@ -35,16 +35,16 @@ impl Handler {
     }
 
     #[inline]
-    pub async fn info<T: ToString + Send + Sync>(&self, v: T) -> io::Result<()> {
-        self.logger.write().await.info(v).await
+    pub async fn info<T: ToString + Send + Sync>(&self, v: T) {
+        self.logger.write().await.info(v).await.ok();
     }
     #[inline]
-    pub async fn warn<T: ToString + Send + Sync>(&self, v: T) -> io::Result<()> {
-        self.logger.write().await.warn(v).await
+    pub async fn warn<T: ToString + Send + Sync>(&self, v: T) {
+        self.logger.write().await.warn(v).await.ok();
     }
     #[inline]
-    pub async fn error<T: ToString + Send + Sync>(&self, v: T) -> io::Result<()> {
-        self.logger.write().await.error(v).await
+    pub async fn error<T: ToString + Send + Sync>(&self, v: T) {
+        self.logger.write().await.error(v).await.ok();
     }
     #[inline]
     pub async fn storage(&self) -> RwLockWriteGuard<Storage> {
@@ -87,11 +87,11 @@ impl Handler {
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         let cheer = format!("Connected to the API: {}", ready.user.tag());
-        self.info(cheer).await.ok();
+        self.info(cheer).await;
 
         if let Some(info) = ready.shard {
             let shards = format!("Sharding enabled: {} total", info.total);
-            self.info(shards).await.ok();
+            self.info(shards).await;
         }
 
         self.update_presence(&ctx);
@@ -99,11 +99,11 @@ impl EventHandler for Handler {
         match self.register_guild_commands(&ctx).await {
             Ok(count) => {
                 let text = format!("Commands registered: {count} (guild)");
-                self.info(text).await.ok()
+                self.info(text).await;
             }
             Err(reason) => {
                 let error = format!("Command registration failed: {reason}");
-                self.warn(error).await.ok()
+                self.warn(error).await;
             }
         };
     }
@@ -116,13 +116,13 @@ impl EventHandler for Handler {
         });
 
         let text = format!("Presence updated: {status}, {activity}");
-        self.info(text).await.ok();
+        self.info(text).await;
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(cmd) = interaction {
             let info = format!("Command received: {}", cmd.data.name);
-            self.info(info).await.ok();
+            self.info(info).await;
 
             let result = match cmd.data.name.as_str() {
                 command::embed::NAME => command::embed::run(&ctx, &cmd).await,
@@ -134,10 +134,10 @@ impl EventHandler for Handler {
 
             if let Err(reason) = result {
                 let text = format!("Command failed: {}, {reason}", cmd.data.name);
-                self.error(text).await.ok();
+                self.error(text).await;
             } else {
                 let text = format!("Executed command: {}", cmd.data.name);
-                self.info(text).await.ok();
+                self.info(text).await;
             }
         }
     }
