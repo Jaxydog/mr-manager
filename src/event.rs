@@ -57,6 +57,7 @@ impl Handler {
             command::embed::register(),
             command::help::register(),
             command::offer::register(),
+            command::oracle::register(),
             command::ping::register(),
         ]
     }
@@ -136,6 +137,7 @@ impl EventHandler for Handler {
                 command::embed::NAME => command::embed::run(&ctx, &cmd).await,
                 command::help::NAME => command::help::run(&ctx, &cmd).await,
                 command::offer::NAME => command::offer::run(&ctx, &cmd).await,
+                command::oracle::NAME => command::oracle::run(&ctx, &cmd).await,
                 command::ping::NAME => command::ping::run(&ctx, &cmd).await,
                 _ => Err(Error::MissingCommand),
             },

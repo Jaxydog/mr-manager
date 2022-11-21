@@ -14,6 +14,7 @@ pub mod data;
 pub mod embed;
 pub mod help;
 pub mod offer;
+pub mod oracle;
 pub mod ping;
 #[allow(clippy::use_self)]
 pub mod poll;
