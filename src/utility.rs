@@ -20,6 +20,8 @@ pub enum Error {
     MissingCommandData,
     MissingInteraction,
     MissingDevGuild,
+    MissingChannel,
+    MissingMessage,
     Other(String),
 }
 
@@ -67,6 +69,8 @@ impl Display for Error {
             Self::MissingCommandData => "The received command is missing data",
             Self::MissingInteraction => "The received interaction is not handled",
             Self::MissingDevGuild => "Missing development guild identifier",
+            Self::MissingChannel => "Missing guild channel",
+            Self::MissingMessage => "Missing guild message",
             Self::Other(s) => s,
         };
 
