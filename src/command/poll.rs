@@ -4,21 +4,22 @@ use const_format::formatcp;
 use serde::{Deserialize, Serialize};
 use serenity::{
     builder::{
-        CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateInputText,
-        CreateMessage, CreateModal, EditMessage,
+        CreateActionRow, CreateButton, CreateCommand, CreateEmbed, CreateEmbedAuthor,
+        CreateInputText, CreateMessage, CreateModal, EditMessage,
     },
     model::{
         prelude::{
             component::{ButtonStyle, InputTextStyle},
-            ChannelId, GuildChannel, GuildId, Message, MessageId, PartialGuild, ReactionType,
-            UserId,
+            ChannelId, CommandInteraction, GuildChannel, GuildId, Message, MessageId, PartialGuild,
+            ReactionType, UserId,
         },
-        Color,
+        Color, Permissions,
     },
     prelude::{CacheHttp, Context},
 };
 
 use crate::{
+    event::Handler,
     utility::{
         storage::{Request, Storage},
         to_unix_str, Error, Result,
@@ -483,4 +484,15 @@ impl Poll {
         anchor.channel_id.send_message(ctx.http(), results).await?;
         self.archive(db).await
     }
+}
+
+pub fn register() -> CreateCommand {
+    CreateCommand::new(NAME)
+        .description("Create or manage polls")
+        .default_member_permissions(Permissions::SEND_MESSAGES)
+        .dm_permission(false)
+}
+
+pub async fn run(handler: &Handler, ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+    Ok(())
 }

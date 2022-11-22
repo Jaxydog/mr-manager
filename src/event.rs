@@ -59,6 +59,7 @@ impl Handler {
             command::offer::register(),
             command::oracle::register(),
             command::ping::register(),
+            command::poll::register(),
         ]
     }
 
@@ -139,6 +140,7 @@ impl EventHandler for Handler {
                 command::offer::NAME => command::offer::run(&ctx, &cmd).await,
                 command::oracle::NAME => command::oracle::run(&ctx, &cmd).await,
                 command::ping::NAME => command::ping::run(&ctx, &cmd).await,
+                command::poll::NAME => command::poll::run(self, &ctx, &cmd).await,
                 _ => Err(Error::MissingCommand),
             },
             _ => Err(Error::MissingInteraction),
