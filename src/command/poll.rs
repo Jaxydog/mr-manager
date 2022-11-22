@@ -1,297 +1,428 @@
-use std::fmt::{self, Display, Formatter};
+use std::num::NonZeroU8;
 
-use chrono::Utc;
-use rand::{thread_rng, Rng};
+use const_format::formatcp;
 use serde::{Deserialize, Serialize};
 use serenity::{
     builder::{
-        CreateActionRow, CreateAttachment, CreateButton, CreateEmbed, CreateEmbedAuthor,
-        CreateInputText, CreateMessage, CreateModal, EditMessage,
+        CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateInputText,
+        CreateMessage, CreateModal, EditMessage,
     },
-    model::prelude::{
-        component::{ButtonStyle, InputTextStyle},
-        ChannelId, GuildId, MessageId, ReactionType, UserId,
+    model::{
+        prelude::{
+            component::{ButtonStyle, InputTextStyle},
+            ChannelId, GuildChannel, GuildId, Message, MessageId, PartialGuild, ReactionType,
+            UserId,
+        },
+        Color,
     },
     prelude::{CacheHttp, Context},
 };
 
 use crate::{
     utility::{
-        storage::{insert_temp, remove_temp, Request, Storage},
+        storage::{Request, Storage},
         to_unix_str, Error, Result,
     },
     DEFAULT_COLOR,
 };
 
 pub const NAME: &str = "poll";
+pub const MULTIPLE_CHOICE_BUTTON: &str = formatcp!("{NAME}_choice");
+pub const TEXT_RESPONSE_BUTTON: &str = formatcp!("{NAME}_text");
+pub const TEXT_RESPONSE_INFO_BUTTON: &str = formatcp!("{TEXT_RESPONSE_BUTTON}_info");
+pub const TEXT_RESPONSE_MODAL: &str = formatcp!("{NAME}_text");
+pub const RANDOM_WINNER_BUTTON: &str = formatcp!("{NAME}_random");
+pub const RANDOM_WINNER_INFO_BUTTON: &str = formatcp!("{RANDOM_WINNER_BUTTON}_info");
+pub const REMOVE_BUTTON: &str = formatcp!("{NAME}_remove");
+pub const RESULTS_BUTTON: &str = formatcp!("{NAME}_results");
 
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 enum Kind {
-    Straw,
-    Choice,
-    Open,
+    MultipleChoice,
+    TextResponse,
+    RandomWinner,
 }
 
-impl Display for Kind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let raw = match self {
-            Self::Straw => "Straw-Picking",
-            Self::Choice => "Multiple Choice",
-            Self::Open => "Open-Ended",
-        };
-
-        write!(f, "{raw}")
+impl Kind {
+    const fn has_inputs(self) -> bool {
+        self.max_inputs() > 0
+    }
+    const fn max_inputs(self) -> usize {
+        match self {
+            Self::MultipleChoice => 10,
+            Self::TextResponse => 5,
+            Self::RandomWinner => 3,
+        }
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+impl std::fmt::Display for Kind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (index, character) in format!("{self:?}").char_indices() {
+            if character.is_uppercase() && index > 0 {
+                write!(f, " ")?;
+            }
+
+            write!(f, "{character}")?;
+        }
+
+        Ok(())
+    }
+}
+
+#[non_exhaustive]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+enum Input {
+    MultipleChoice {
+        input_id: u8,
+        label: String,
+        icon: Option<ReactionType>,
+    },
+    TextResponse {
+        input_id: u8,
+        label: String,
+        placeholder: Option<String>,
+    },
+    RandomWinner {
+        input_id: u8,
+        label: String,
+        icon: Option<ReactionType>,
+    },
+}
+
+impl Input {
+    const fn kind(&self) -> Kind {
+        match self {
+            Self::MultipleChoice { .. } => Kind::MultipleChoice,
+            Self::TextResponse { .. } => Kind::TextResponse,
+            Self::RandomWinner { .. } => Kind::RandomWinner,
+        }
+    }
+    const fn input_id(&self) -> u8 {
+        match self {
+            Self::MultipleChoice { input_id, .. }
+            | Self::TextResponse { input_id, .. }
+            | Self::RandomWinner { input_id, .. } => *input_id,
+        }
+    }
+    const fn label(&self) -> &String {
+        match self {
+            Self::MultipleChoice { label, .. }
+            | Self::TextResponse { label, .. }
+            | Self::RandomWinner { label, .. } => label,
+        }
+    }
+}
+
+#[non_exhaustive]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+enum Reply {
+    MultipleChoice {
+        user_id: UserId,
+        input_id: u8,
+    },
+    TextResponse {
+        user_id: UserId,
+        response: Vec<(u8, String)>,
+    },
+    RandomWinner {
+        user_id: UserId,
+        input_id: u8,
+    },
+}
+
+impl Reply {
+    const fn kind(&self) -> Kind {
+        match self {
+            Self::MultipleChoice { .. } => Kind::MultipleChoice,
+            Self::TextResponse { .. } => Kind::TextResponse,
+            Self::RandomWinner { .. } => Kind::RandomWinner,
+        }
+    }
+    const fn user_id(&self) -> UserId {
+        match self {
+            Self::MultipleChoice { user_id, .. }
+            | Self::TextResponse { user_id, .. }
+            | Self::RandomWinner { user_id, .. } => *user_id,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct Content {
+    kind: Kind,
+    title: String,
+    description: String,
+    hours: NonZeroU8,
+    hide_users: bool,
+    hide_results: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct Anchor {
+    guild_id: GuildId,
+    channel_id: ChannelId,
+    message_id: MessageId,
+}
+
+impl Anchor {
+    fn as_link(&self) -> String {
+        format!(
+            "https://discord.com/channels/{}/{}/{}/",
+            self.guild_id, self.channel_id, self.message_id
+        )
+    }
+
+    async fn resolve_guild(&self, ctx: &Context) -> Result<PartialGuild> {
+        Ok(self.guild_id.to_partial_guild(ctx.http()).await?)
+    }
+    async fn resolve_channel(&self, ctx: &Context) -> Result<GuildChannel> {
+        let guild = self.resolve_guild(ctx).await?;
+        let mut channels = guild.channels(ctx.http()).await?;
+
+        channels
+            .remove(&self.channel_id)
+            .ok_or(Error::MissingChannel)
+    }
+    async fn resolve_message(&self, ctx: &Context) -> Result<Message> {
+        let channel = self.resolve_channel(ctx).await?;
+        Ok(channel.message(ctx.http(), self.message_id).await?)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Poll {
     user_id: UserId,
-    kind: Kind,
     inputs: Vec<Input>,
-    outputs: Vec<Output>,
+    replies: Vec<Reply>,
     content: Content,
     anchor: Option<Anchor>,
 }
 
 impl Poll {
-    fn data_request_for(user_id: UserId) -> Request {
-        Request::new(NAME, &user_id.to_string())
-    }
-    fn data_request(&self) -> Request {
-        Self::data_request_for(self.user_id)
-    }
-    fn log_request_for(user_id: UserId, message_id: MessageId) -> Request {
-        Request::new(&format!("{NAME}/{user_id}"), &message_id.to_string())
-    }
-    fn log_request(&self) -> Option<Request> {
-        self.anchor
-            .as_ref()
-            .map(|anchor| Self::log_request_for(self.user_id, anchor.message_id))
-    }
-    fn temp_request_for(user_id: UserId) -> Request {
-        Request::new(&format!("temp/{NAME}"), &user_id.to_string())
-    }
-    fn temp_request(&self) -> Request {
-        Self::temp_request_for(self.user_id)
+    const ERROR_ANCHORED: Error = Error::Other("Poll has been sent");
+    const ERROR_UNANCHORED: Error = Error::Other("Poll has not been sent");
+    const ERROR_ARCHIVED: Error = Error::Other("Poll has been archived");
+    const ERROR_UNARCHIVED: Error = Error::Other("Poll has not been archived");
+    const ERROR_WRONG_KIND: Error = Error::Other("Unexpected poll type");
+
+    const fn anchor(&self) -> Option<&Anchor> {
+        self.anchor.as_ref()
     }
 
-    const fn is_sent(&self) -> bool {
+    fn is_of(&self, kind: Kind) -> bool {
+        self.content.kind == kind
+    }
+    fn ensure_is_of(&self, kind: Kind) -> Result<()> {
+        self.is_of(kind).then_some(()).ok_or(Self::ERROR_WRONG_KIND)
+    }
+
+    const fn is_anchored(&self) -> bool {
         self.anchor.is_some()
     }
-    const fn is_unsent(&self) -> bool {
+    const fn is_unanchored(&self) -> bool {
         self.anchor.is_none()
     }
 
-    const fn has_public_users(&self) -> bool {
-        !self.content.hide_users
+    async fn is_archived(&self, db: &Storage) -> bool {
+        let Ok(request) = self.new_archive_request() else {
+			return false;
+		};
+
+        db.contains(&request).await
     }
-    const fn has_private_users(&self) -> bool {
-        self.content.hide_users
-    }
-    const fn has_public_results(&self) -> bool {
-        !self.content.hide_results
-    }
-    const fn has_private_results(&self) -> bool {
-        self.content.hide_results
+    async fn is_unarchived(&self, db: &Storage) -> bool {
+        db.contains(&self.new_data_request()).await
     }
 
-    async fn get(db: &mut Storage, user_id: UserId, kind: Kind) -> Result<Self> {
-        let poll: Self = db.get(&Self::data_request_for(user_id)).await?;
-
-        if poll.kind == kind {
-            Ok(poll)
-        } else {
-            Err(Error::Other("Invalid poll type".into()))
-        }
+    fn new_archive_request_for(user_id: UserId, message_id: MessageId) -> Request {
+        Request::new(&format!("{NAME}\\{user_id}"), &message_id.to_string())
     }
-    async fn get_sent(db: &mut Storage, user_id: UserId, kind: Kind) -> Result<Self> {
-        let poll = Self::get(db, user_id, kind).await?;
-
-        if poll.is_sent() {
-            Ok(poll)
-        } else {
-            Err(Error::Other("Poll has not been sent".into()))
-        }
+    fn new_data_request_for(user_id: UserId) -> Request {
+        Request::new(NAME, &user_id.to_string())
     }
-    async fn get_unsent(db: &mut Storage, user_id: UserId, kind: Kind) -> Result<Self> {
-        let poll = Self::get(db, user_id, kind).await?;
-
-        if poll.is_unsent() {
-            Ok(poll)
-        } else {
-            Err(Error::Other("Poll has already been sent".into()))
-        }
+    fn new_temp_request_for(user_id: UserId) -> Request {
+        Request::new(&format!("temp\\{NAME}"), &user_id.to_string())
     }
+
+    fn new_archive_request(&self) -> Result<Request> {
+        self.anchor()
+            .map(|a| Self::new_archive_request_for(self.user_id, a.message_id))
+            .ok_or(Self::ERROR_UNANCHORED)
+    }
+    fn new_data_request(&self) -> Request {
+        Self::new_data_request_for(self.user_id)
+    }
+    fn new_temp_request(&self) -> Request {
+        Self::new_temp_request_for(self.user_id)
+    }
+
+    async fn get(db: &mut Storage, user_id: UserId) -> Result<Self> {
+        db.get(&Self::new_data_request_for(user_id)).await
+    }
+    async fn get_anchored(db: &mut Storage, user_id: UserId) -> Result<Self> {
+        let poll = Self::get(db, user_id).await?;
+
+        poll.is_anchored()
+            .then_some(poll)
+            .ok_or(Self::ERROR_UNANCHORED)
+    }
+    async fn get_unanchored(db: &mut Storage, user_id: UserId) -> Result<Self> {
+        let poll = Self::get(db, user_id).await?;
+
+        poll.is_unanchored()
+            .then_some(poll)
+            .ok_or(Self::ERROR_ANCHORED)
+    }
+    async fn get_archived(
+        db: &mut Storage,
+        user_id: UserId,
+        message_id: MessageId,
+    ) -> Result<Self> {
+        db.get(&Self::new_archive_request_for(user_id, message_id))
+            .await
+    }
+
     async fn save(&self, db: &mut Storage) -> Result<()> {
-        db.insert(&self.data_request(), self).await
+        db.insert(&self.new_data_request(), self).await
     }
     async fn archive(&self, db: &mut Storage) -> Result<()> {
-        if let Some(request) = self.log_request() {
-            db.insert(&request, self).await?;
-            db.remove(&self.data_request()).await
-        } else {
-            Err(Error::Other("Poll has not been sent".into()))
-        }
+        let request = self.new_archive_request()?;
+        db.insert(&request, self).await?;
+        db.remove(&self.new_data_request()).await
     }
-    async fn close(&self, db: &mut Storage, ctx: &Context) -> Result<()> {
-        let Some(anchor) = self.anchor.as_ref() else {
-			return Err(Error::Other("Poll has not been sent".into()))
-		};
-
-        let guild = anchor.guild_id.to_partial_guild(ctx.http()).await?;
-        let channels = guild.channels(ctx.http()).await?;
-        let Some(channel) = channels.get(&anchor.channel_id).cloned() else {
-			return Err(Error::MissingChannel)
-		};
-        let mut message = channel.message(ctx.http(), anchor.message_id).await?;
-        let results = self.create_results_string(ctx).await?;
-        let request = self.temp_request();
-
-        insert_temp(&request, &results).await?;
-        let file = CreateAttachment::path(request.full_path()).await?;
-
-        let mut edit = EditMessage::new().components(vec![]);
-
-        for button in self.create_buttons(true) {
-            edit = edit.button(button);
-        }
-
-        message.edit(ctx.http(), edit).await?;
-
-        if self.has_public_results() {
-            channel
-                .send_files(
-                    ctx.http(),
-                    [file],
-                    CreateMessage::new().reference_message(&message),
-                )
-                .await?;
-        } else if let Ok(channel) = self.user_id.create_dm_channel(ctx.http()).await {
-            channel
-                .send_files(ctx.http(), [file], CreateMessage::new())
-                .await?;
-        } else {
-            channel
-                .send_files(
-                    ctx.http(),
-                    [file],
-                    CreateMessage::new()
-                        .reference_message(&message)
-                        .content("Poll author has DMs disabled"),
-                )
-                .await?;
-        }
-
-        remove_temp(&request).await?;
-        self.archive(db).await
+    async fn unarchive(&self, db: &mut Storage) -> Result<()> {
+        let request = self.new_archive_request()?;
+        db.insert(&self.new_data_request(), self).await?;
+        db.remove(&request).await
     }
 
-    async fn create_embed(&self, ctx: &Context) -> Result<CreateEmbed> {
-        let user = self.user_id.to_user(ctx.http()).await?;
-        let ms = i64::from(self.content.hours) * 60 * 60 * 1000;
-
-        let closes = format!("**Closes:** {}", to_unix_str(ms, "R"));
-        let anonymous = format!("**Anonymous:** {}", self.has_private_users());
-        let results = format!("**Hidden Results:** {}", self.has_private_results());
-        let content = self.content.description.replace(['\t', '\n', '\r'], " ");
-
-        let description = format!("{closes}\n{anonymous}\n{results}\n\n> {content}");
-
-        Ok(CreateEmbed::new()
-            .author(CreateEmbedAuthor::new(user.tag()).icon_url(user.face()))
-            .color(user.accent_colour.unwrap_or(DEFAULT_COLOR))
-            .description(description)
-            .thumbnail(user.face())
-            .title(&self.content.title))
-    }
-    fn create_buttons(&self, disabled: bool) -> Vec<CreateButton> {
-        match self.kind {
-            Kind::Straw => vec![
-                CreateButton::new(format!("{NAME}_straw;{}", self.user_id))
-                    .disabled(disabled)
-                    .emoji('✋')
-                    .label("Participate")
-                    .style(ButtonStyle::Primary),
-                CreateButton::new(format!("{NAME}_straw_info"))
-                    .disabled(disabled)
-                    .emoji('ℹ')
-                    .label(format!("About {} Polls", Kind::Straw))
-                    .style(ButtonStyle::Secondary),
-            ],
-            Kind::Choice => {
-                let mut buttons = vec![];
-
-                for input in self.inputs.iter().take(25) {
-                    let Input::Choice(id, label, icon) = input else {
-						continue;
-					};
-
-                    let custom_id = format!("{NAME}_choice;{};{id}", self.user_id);
-                    let button = CreateButton::new(custom_id)
-                        .disabled(disabled)
-                        .label(label)
-                        .style(ButtonStyle::Secondary);
-
-                    buttons.push(if let Some(emoji) = icon {
-                        button.emoji(emoji.clone())
-                    } else {
-                        button
-                    });
-                }
-
-                buttons
-            }
-            Kind::Open => vec![
-                CreateButton::new(format!("{NAME}_open;{}", self.user_id))
-                    .disabled(disabled)
-                    .emoji('📨')
-                    .label("Submit")
-                    .style(ButtonStyle::Primary),
-                CreateButton::new(format!("{NAME}_open_info"))
-                    .disabled(disabled)
-                    .emoji('ℹ')
-                    .label(format!("About {} Polls", Kind::Open))
-                    .style(ButtonStyle::Secondary),
-            ],
-        }
-    }
-    fn create_remove_buttons(&self) -> Vec<CreateButton> {
+    fn __build_display_buttons_multiple_choice(&self, enabled: bool) -> Vec<CreateButton> {
+        let count = self.content.kind.max_inputs();
         let mut buttons = vec![];
 
-        for input in self.inputs.iter().take(25) {
-            let (id, label) = match input {
-                Input::Choice(id, label, _) | Input::Open(id, label, _) => (*id, label),
-            };
+        for input in self.inputs.iter().take(count) {
+            let Input::MultipleChoice { input_id, label, icon } = input else {
+				continue;
+			};
 
-            let custom_id = format!("{NAME}_remove;{};{id}", self.user_id);
+            let custom_id = format!("{MULTIPLE_CHOICE_BUTTON};{};{input_id}", self.user_id);
+            let button = CreateButton::new(custom_id)
+                .disabled(!enabled)
+                .label(label)
+                .style(ButtonStyle::Secondary);
 
-            buttons.push(
-                CreateButton::new(custom_id)
-                    .label(label)
-                    .style(ButtonStyle::Danger),
-            );
+            buttons.push(if let Some(emoji) = icon {
+                button.emoji(emoji.clone())
+            } else {
+                button
+            });
         }
 
         buttons
     }
-    fn create_modal(&self) -> Option<CreateModal> {
-        if self.kind != Kind::Open {
-            return None;
-        }
+    fn __build_display_buttons_text_response(&self, enabled: bool) -> Vec<CreateButton> {
+        vec![
+            CreateButton::new(format!("{TEXT_RESPONSE_BUTTON};{}", self.user_id))
+                .disabled(!enabled)
+                .emoji('📨')
+                .label("Submit")
+                .style(ButtonStyle::Primary),
+            CreateButton::new(TEXT_RESPONSE_INFO_BUTTON)
+                .disabled(!enabled)
+                .emoji('ℹ')
+                .label(format!("About {} Polls", Kind::TextResponse))
+                .style(ButtonStyle::Secondary),
+        ]
+    }
+    fn __build_display_buttons_random_winner(&self, enabled: bool) -> Vec<CreateButton> {
+        let count = self.content.kind.max_inputs();
+        let mut buttons = vec![];
 
-        let mut components = vec![];
-
-        for input in self.inputs.iter().take(5) {
-            let Input::Open(id, label, hint) = input else {
+        for input in self.inputs.iter().take(count) {
+            let Input::RandomWinner { input_id, label, icon } = input else {
 				continue;
 			};
 
-            let input = CreateInputText::new(InputTextStyle::Paragraph, label, id.to_string());
+            let custom_id = format!("{RANDOM_WINNER_BUTTON};{};{input_id}", self.user_id);
+            let button = CreateButton::new(custom_id)
+                .disabled(!enabled)
+                .label(label)
+                .style(ButtonStyle::Secondary);
+
+            buttons.push(if let Some(emoji) = icon {
+                button.emoji(emoji.clone())
+            } else {
+                button
+            });
+        }
+
+        buttons.push(
+            CreateButton::new(RANDOM_WINNER_INFO_BUTTON)
+                .disabled(!enabled)
+                .emoji('ℹ')
+                .label(format!("About {} Polls", Kind::RandomWinner))
+                .style(ButtonStyle::Secondary),
+        );
+
+        buttons
+    }
+    fn __build_display_buttons(&self, enabled: bool) -> Vec<CreateButton> {
+        match self.content.kind {
+            Kind::MultipleChoice => self.__build_display_buttons_multiple_choice(enabled),
+            Kind::TextResponse => self.__build_display_buttons_text_response(enabled),
+            Kind::RandomWinner => self.__build_display_buttons_random_winner(enabled),
+        }
+    }
+    async fn build_display(&self, ctx: &Context, enabled: bool) -> Result<CreateMessage> {
+        let user = self.user_id.to_user(ctx.http()).await?;
+        let millis = i64::from(u8::from(self.content.hours)) * 60 * 60 * 1000;
+        let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
+        let color = user.accent_colour.unwrap_or(DEFAULT_COLOR);
+        let mut description = String::new();
+
+        {
+            use std::fmt::Write;
+            let f = &mut description;
+
+            writeln!(f, "**Closes:** {}", to_unix_str(millis, "R"))?;
+            writeln!(f, "**Users hidden:** {}", self.content.hide_users)?;
+            writeln!(f, "**Results hidden:** {}", self.content.hide_results)?;
+            writeln!(f, "\n> {}", self.content.description)?;
+        }
+
+        let embed = CreateEmbed::new()
+            .author(author)
+            .color(color)
+            .description(description)
+            .thumbnail(user.face())
+            .title(&self.content.title);
+
+        let mut message = CreateMessage::new().embed(embed);
+
+        for button in self.__build_display_buttons(enabled) {
+            message = message.button(button);
+        }
+
+        Ok(message)
+    }
+    fn build_modal(&self) -> Result<CreateModal> {
+        self.ensure_is_of(Kind::TextResponse)?;
+
+        let count = self.content.kind.max_inputs();
+        let mut components = vec![];
+
+        for input in self.inputs.iter().take(count) {
+            let Input::TextResponse { input_id, label, placeholder } = input else {
+				continue;
+			};
+
+            let custom_id = input_id.to_string();
+            let input = CreateInputText::new(InputTextStyle::Paragraph, label, custom_id);
 
             components.push(CreateActionRow::InputText(
-                if let Some(label) = hint.as_ref() {
+                if let Some(label) = placeholder {
                     input.placeholder(label)
                 } else {
                     input
@@ -299,209 +430,57 @@ impl Poll {
             ));
         }
 
-        let custom_id = format!("{NAME}_modal;{}", self.user_id);
-        Some(CreateModal::new(custom_id, "Submit poll response").components(components))
+        let custom_id = format!("{TEXT_RESPONSE_MODAL};{}", self.user_id);
+        Ok(CreateModal::new(custom_id, "Submit poll response").components(components))
     }
+    fn build_remove(&self) -> CreateMessage {
+        let inputs = self.content.kind.max_inputs();
+        let embed = CreateEmbed::new().color(Color::RED).title("Remove inputs!");
+        let mut message = CreateMessage::new().embed(embed);
 
-    fn create_results_header(&self) -> Result<String> {
-        self.anchor.as_ref().map_or_else(
-            || Err(Error::Other("Poll has not been sent".into())),
-            |anchor| {
-                let header = format!("Results for poll \"{}\"", self.content.title);
-                let created = to_unix_str(anchor.message_id.created_at().timestamp_millis(), "f");
-                let closed = to_unix_str(Utc::now().timestamp_millis(), "f");
+        for input in self.inputs.iter().take(inputs) {
+            let input_id = input.input_id();
+            let label = input.label();
+            let custom_id = format!("{REMOVE_BUTTON};{};{input_id}", self.user_id);
 
-                Ok(format!(
-                    "{header}\nCreated: {created}\nClosed: {closed}\n\n"
-                ))
-            },
-        )
-    }
-    async fn __create_results_straw(&self, ctx: &Context) -> Result<String> {
-        let total = format!("Total participating: {}", self.outputs.len());
-
-        if self.outputs.is_empty() {
-            return Ok(format!("{total}\nNo winner"));
+            message = message.button(
+                CreateButton::new(custom_id)
+                    .label(label)
+                    .style(ButtonStyle::Danger),
+            );
         }
 
-        let list = if self.has_public_users() {
-            let mut list = "Users: ".to_string();
-
-            for output in &self.outputs {
-                let Output::Straw(id) = output else {
-					continue;
-				};
-
-                let user = id.to_user(ctx.http()).await?;
-                list.push_str(&format!("{}, ", user.tag()));
-            }
-
-            list.trim_end_matches(", ").to_string()
-        } else {
-            "*Users hidden*".into()
-        };
-
-        let index = thread_rng().gen_range(0..self.outputs.len());
-        let victor = self.outputs[index]
-            .user_id()
-            .to_user(ctx.http())
-            .await?
-            .tag();
-
-        let winner = format!("Winner: {victor}");
-
-        Ok(format!("{total}\n{list}\n{winner}"))
+        message
     }
-    #[allow(clippy::cast_precision_loss)]
-    async fn __create_results_choice(&self, ctx: &Context) -> Result<String> {
-        let responses = format!("Total responses: {}", self.outputs.len());
-        let mut results = vec![];
+    async fn build_results(&self, ctx: &Context) -> Result<CreateMessage> {
+        let user = self.user_id.to_user(ctx.http()).await?;
+        let color = user.accent_colour.unwrap_or(DEFAULT_COLOR);
+        let mut embed = CreateEmbed::new().color(color).title("Poll is now closed!");
 
-        for input in self.inputs.iter().take(25) {
-            let Input::Choice(id, label, _) = input else {
-				continue;
-			};
-            let valid = self.outputs.iter().filter(|o| match o {
-                Output::Choice(_, i) => i == id,
-                _ => false,
-            });
-
-            let count = valid.clone().count();
-
-            let percent = if count == 0 {
-                (count as f64 / self.outputs.len() as f64) * 100.0
-            } else {
-                0.0
-            };
-
-            let users = if self.has_public_users() {
-                let mut users = vec![];
-
-                for user_id in valid.map(Output::user_id) {
-                    users.push(user_id.to_user(ctx.http()).await?.tag());
-                }
-
-                users.join(", ")
-            } else {
-                "*Users hidden*".into()
-            };
-
-            let text = format!("{label}\n\tUsers: {users}\n\tTotal: {count} ({percent:.2}%)");
-            results.push((count, text));
+        if self.content.hide_results {
+            embed = embed.description("*Results may only be viewed by the poll author.*");
         }
 
-        results.sort_unstable_by_key(|(c, _)| *c);
-        results.reverse();
+        let button = CreateButton::new(format!("{RESULTS_BUTTON};{}", self.user_id))
+            .emoji('📊')
+            .label("View Results")
+            .style(ButtonStyle::Primary);
 
-        let results = results
-            .into_iter()
-            .map(|(_, t)| t)
-            .collect::<Vec<_>>()
-            .join("\n\n");
-
-        Ok(format!("{responses}\n\n{results}"))
+        Ok(CreateMessage::new().embed(embed).button(button))
     }
-    async fn __create_results_open(&self, ctx: &Context) -> Result<String> {
-        let responses = format!("Total responses: {}", self.outputs.len());
-        let mut results = vec![];
 
-        for input in self.inputs.iter().take(25) {
-            let Input::Open(input_id, label, _) = input else {
-				continue;
-			};
+    async fn close(&self, db: &mut Storage, ctx: &Context) -> Result<()> {
+        let anchor = self.anchor().ok_or(Self::ERROR_UNANCHORED)?;
+        let results = self.build_results(ctx).await?;
+        let mut message = anchor.resolve_message(ctx).await?;
+        let mut edit = EditMessage::new().components(vec![]);
 
-            let mut result = format!("{label}\n");
-
-            for output in &self.outputs {
-                let Output::Open(user_id, answers) = output else {
-					continue;
-				};
-
-                for (id, answer) in answers {
-                    if input_id != id {
-                        continue;
-                    }
-
-                    if self.has_public_users() {
-                        let tag = user_id.to_user(ctx.http()).await?.tag();
-                        result.push_str(&format!("\t{tag} - {answer}\n"));
-                    } else {
-                        result.push_str(&format!("\t{answer}\n"));
-                    }
-                }
-            }
-
-            results.push(result.trim().to_string());
+        for button in self.__build_display_buttons(false) {
+            edit = edit.button(button);
         }
 
-        Ok(format!("{responses}\n\n{}", results.join("\n\n")))
-    }
-    async fn create_results_string(&self, ctx: &Context) -> Result<String> {
-        if self.is_unsent() {
-            return Err(Error::Other("Poll has not been sent".into()));
-        }
-
-        let mut string = self.create_results_header()?;
-
-        string.push_str(&match self.kind {
-            Kind::Straw => self.__create_results_straw(ctx).await?,
-            Kind::Choice => self.__create_results_choice(ctx).await?,
-            Kind::Open => self.__create_results_open(ctx).await?,
-        });
-
-        Ok(string)
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Content {
-    title: String,
-    description: String,
-    hours: u8,
-    hide_users: bool,
-    hide_results: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Anchor {
-    guild_id: GuildId,
-    channel_id: ChannelId,
-    message_id: MessageId,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-enum Input {
-    Choice(u8, String, Option<ReactionType>),
-    Open(u8, String, Option<String>),
-}
-
-impl Input {
-    pub const fn kind(&self) -> Kind {
-        match self {
-            Self::Choice(..) => Kind::Choice,
-            Self::Open(..) => Kind::Open,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-enum Output {
-    Straw(UserId),
-    Choice(UserId, u8),
-    Open(UserId, Vec<(u8, String)>),
-}
-
-impl Output {
-    pub const fn kind(&self) -> Kind {
-        match self {
-            Self::Straw(..) => Kind::Straw,
-            Self::Choice(..) => Kind::Choice,
-            Self::Open(..) => Kind::Open,
-        }
-    }
-    pub const fn user_id(&self) -> UserId {
-        match self {
-            Output::Straw(id) | Output::Choice(id, _) | Output::Open(id, _) => *id,
-        }
+        message.edit(ctx.http(), edit).await?;
+        anchor.channel_id.send_message(ctx.http(), results).await?;
+        self.archive(db).await
     }
 }

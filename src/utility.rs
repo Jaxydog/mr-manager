@@ -12,6 +12,7 @@ pub enum Error {
     RustMPDecode(rmp_serde::decode::Error),
     RustMPEncode(rmp_serde::encode::Error),
     Serenity(serenity::Error),
+    Fmt(std::fmt::Error),
     Io(tokio::io::Error),
     InvalidCommandData,
     InvalidDevGuild,
@@ -22,7 +23,7 @@ pub enum Error {
     MissingDevGuild,
     MissingChannel,
     MissingMessage,
-    Other(String),
+    Other(&'static str),
 }
 
 impl From<rmp_serde::decode::Error> for Error {
@@ -43,14 +44,20 @@ impl From<serenity::Error> for Error {
     }
 }
 
+impl From<std::fmt::Error> for Error {
+    fn from(error: std::fmt::Error) -> Self {
+        Self::Fmt(error)
+    }
+}
+
 impl From<tokio::io::Error> for Error {
     fn from(error: tokio::io::Error) -> Self {
         Self::Io(error)
     }
 }
 
-impl From<String> for Error {
-    fn from(string: String) -> Self {
+impl From<&'static str> for Error {
+    fn from(string: &'static str) -> Self {
         Self::Other(string)
     }
 }
@@ -61,6 +68,7 @@ impl Display for Error {
             Self::RustMPDecode(e) => return e.fmt(f),
             Self::RustMPEncode(e) => return e.fmt(f),
             Self::Serenity(e) => return e.fmt(f),
+            Self::Fmt(e) => return e.fmt(f),
             Self::Io(e) => return e.fmt(f),
             Self::InvalidCommandData => "The received command is contains invalid data",
             Self::InvalidDevGuild => "Invalid development guild identifier",
