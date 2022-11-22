@@ -1,0 +1,7 @@
+Guild applications are a way to help a guild's moderators manage new members.
+
+Applicants will be presented with an in-app form that asks 1-5 questions, which should be answered truthfully and to the best of the member's ability. If you aren't comfortable answering a question, that's okay! Please also keep in mind that your answers are stored, so don't include any personal information (see "Data Privacy" for more information).
+
+Once an application form is submitted, the moderators of the guild will look over your responses and decide whether you are a suitable fit for the guild. Once decided, you will also receive a notification directly from MrManager informing you of the result, however you must have direct messages enabled. If your application is accepted, you will automatically be granted access to the server.
+
+If you have any concerns you may message <@206260650010345483> directly! We hope to hear from you soon!

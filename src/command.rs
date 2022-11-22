@@ -8,8 +8,6 @@ use serenity::model::{
 
 use crate::utility::{Error, Result};
 
-#[allow(clippy::use_self)]
-pub mod apply;
 pub mod data;
 pub mod embed;
 pub mod help;
