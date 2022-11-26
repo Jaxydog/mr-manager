@@ -118,17 +118,20 @@ pub fn new() -> CreateCommand {
 }
 
 pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+    let c = &cmd.data.name;
+    let o = &cmd.data.options();
+
     let mut embed = CreateEmbed::new();
     let mut length = 0;
     let mut valid = false;
 
-    if let Ok(name) = get_str(cmd, AUTHOR_NAME) {
-        let mut author = CreateEmbedAuthor::new(&name);
+    if let Ok(name) = get_str(c, o, AUTHOR_NAME) {
+        let mut author = CreateEmbedAuthor::new(name);
 
-        if let Ok(icon_url) = get_str(cmd, AUTHOR_ICON) {
+        if let Ok(icon_url) = get_str(c, o, AUTHOR_ICON) {
             author = author.icon_url(icon_url);
         }
-        if let Ok(url) = get_str(cmd, AUTHOR_LINK) {
+        if let Ok(url) = get_str(c, o, AUTHOR_LINK) {
             author = author.url(url);
         }
 
@@ -137,27 +140,27 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         valid = true;
     }
 
-    if let Ok(hex) = get_str(cmd, COLOR) {
+    if let Ok(hex) = get_str(c, o, COLOR) {
         let color = if hex.is_empty() {
             let user = ctx.http.get_user(cmd.user.id).await?;
             user.accent_colour
         } else {
-            u32::from_str_radix(&hex, 16).ok().map(Color::new)
+            u32::from_str_radix(hex, 16).ok().map(Color::new)
         };
 
         embed = embed.color(color.unwrap_or(BOT_COLOR));
     }
 
-    if let Ok(description) = get_str(cmd, DESCRIPTION) {
-        embed = embed.description(&description);
+    if let Ok(description) = get_str(c, o, DESCRIPTION) {
+        embed = embed.description(description);
         length += description.chars().count();
         valid = true;
     }
 
-    if let Ok(text) = get_str(cmd, FOOTER_TEXT) {
-        let mut footer = CreateEmbedFooter::new(&text);
+    if let Ok(text) = get_str(c, o, FOOTER_TEXT) {
+        let mut footer = CreateEmbedFooter::new(text);
 
-        if let Ok(icon_url) = get_str(cmd, FOOTER_ICON) {
+        if let Ok(icon_url) = get_str(c, o, FOOTER_ICON) {
             footer = footer.icon_url(icon_url);
         }
 
@@ -166,22 +169,22 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         valid = true;
     }
 
-    if let Ok(url) = get_str(cmd, IMAGE) {
+    if let Ok(url) = get_str(c, o, IMAGE) {
         embed = embed.image(url);
         valid = true;
     }
 
-    if let Ok(url) = get_str(cmd, THUMBNAIL) {
+    if let Ok(url) = get_str(c, o, THUMBNAIL) {
         embed = embed.thumbnail(url);
         valid = true;
     }
 
-    if let Ok(title) = get_str(cmd, TITLE_TEXT) {
-        if let Ok(url) = get_str(cmd, TITLE_LINK) {
+    if let Ok(title) = get_str(c, o, TITLE_TEXT) {
+        if let Ok(url) = get_str(c, o, TITLE_LINK) {
             embed = embed.url(url);
         }
 
-        embed = embed.title(&title);
+        embed = embed.title(title);
         length += title.chars().count();
         valid = true;
     }
@@ -198,7 +201,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .title("Invalid character count!");
     }
 
-    let ephemeral = !valid || length > 6000 || get_bool(cmd, EPHEMERAL).unwrap_or_default();
+    let ephemeral = !valid || length > 6000 || get_bool(c, o, EPHEMERAL).unwrap_or_default();
 
     cmd.create_response(
         ctx,

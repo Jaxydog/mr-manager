@@ -88,7 +88,8 @@ pub fn new() -> CreateCommand {
 
 pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
     let name = cmd.user.id.to_user(ctx).await?.tag();
-    let query = get_str(cmd, QUERY)?;
+    let o = &cmd.data.options();
+    let query = get_str(&cmd.data.name, o, QUERY)?;
     let index = thread_rng().gen_range(0..ANSWERS.len());
     let reply = ANSWERS[index];
     let embed = reply.make_embed(ctx, (name, query.to_string())).await?;

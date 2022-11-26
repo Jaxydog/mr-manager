@@ -154,9 +154,12 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .await
         .unwrap_or_else(|_| Selector::new(cmd.user.id, guild_id));
 
-    if let Ok(options) = get_subcommand(cmd, CREATE) {
-        let role = get_role_from(cmd.data.name.clone(), &options, ROLE)?;
-        let raw_icon = get_str_from(cmd.data.name.clone(), &options, ICON)?;
+    let c = &cmd.data.name;
+    let o = &cmd.data.options();
+
+    if let Ok(options) = get_subcommand(c, o, CREATE) {
+        let role = get_role(c, options, ROLE)?;
+        let raw_icon = get_str(c, options, ICON)?;
 
         let Ok(icon) = ReactionType::try_from(raw_icon) else {
 			return Err(Error::Other("Invalid icon"))
@@ -175,8 +178,8 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         cmd.create_response(ctx, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
-    } else if let Ok(options) = get_subcommand(cmd, REMOVE) {
-        let role = get_role_from(cmd.data.name.clone(), &options, ROLE)?;
+    } else if let Ok(options) = get_subcommand(c, o, REMOVE) {
+        let role = get_role(c, options, ROLE)?;
 
         selector.toggles.retain(|t| t.role_id != role.id);
         req.write(&selector).await?;
@@ -191,7 +194,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         cmd.create_response(ctx, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
-    } else if get_subcommand(cmd, LIST).is_ok() {
+    } else if get_subcommand(c, o, LIST).is_ok() {
         let embed = CreateEmbed::new().color(BOT_COLOR).title("Role selectors");
         let mut message = CreateInteractionResponseMessage::new()
             .embed(embed)
@@ -204,12 +207,12 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         cmd.create_response(ctx, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
-    } else if let Ok(options) = get_subcommand(cmd, SEND) {
+    } else if let Ok(options) = get_subcommand(c, o, SEND) {
         if selector.toggles.is_empty() {
             return Err(Error::Other("No role selectors have been created"));
         }
 
-        let title = get_str_from(cmd.data.name.clone(), &options, TITLE)?;
+        let title = get_str(c, options, TITLE)?;
         let embed = CreateEmbed::new().color(BOT_COLOR).title(title);
         let mut message = CreateMessage::new().embed(embed);
 

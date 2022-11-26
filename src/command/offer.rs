@@ -45,10 +45,13 @@ pub fn new() -> CreateCommand {
 }
 
 pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+    let c = &cmd.data.name;
+    let o = &cmd.data.options();
+
     let user = ctx.http().get_user(cmd.user.id).await?;
-    let offer = get_str(cmd, OFFER)?;
-    let price = get_str(cmd, PRICE)?;
-    let minutes = get_i64(cmd, MINUTES)?;
+    let offer = get_str(c, o, OFFER)?;
+    let price = get_str(c, o, PRICE)?;
+    let minutes = get_i64(c, o, MINUTES)?;
 
     let time = timestamp_str(minutes * 60 * 1000, "R");
     let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
