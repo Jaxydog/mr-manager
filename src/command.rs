@@ -1,12 +1,4 @@
-use serenity::model::{
-    prelude::{
-        command::CommandOptionType, Attachment, PartialChannel, PartialMember, ResolvedOption,
-        ResolvedValue, Role,
-    },
-    user::User,
-};
-
-use crate::utility::{Error, Result};
+use crate::prelude::*;
 
 pub mod data;
 pub mod embed;
@@ -14,103 +6,67 @@ pub mod help;
 pub mod offer;
 pub mod oracle;
 pub mod ping;
-#[allow(clippy::use_self)]
-pub mod poll;
+pub mod role;
 
-#[inline]
-fn __get_data<'d>(opts: &'d [ResolvedOption], name: &str) -> Result<&'d ResolvedValue<'d>> {
-    opts.iter()
-        .find(|d| d.name == name)
-        .map(|v| &v.value)
-        .ok_or(Error::MissingCommandData)
+fn __get_data_from<'c>(
+    c: String,
+    o: &[ResolvedOption<'c>],
+    n: &'static str,
+) -> Result<ResolvedValue<'c>> {
+    o.iter().find(|o| o.name == n).map_or_else(
+        || Err(Error::MissingCommandData(c, n)),
+        |o| Ok(o.value.clone()),
+    )
+}
+fn __get_data<'c>(cmd: &'c CommandInteraction, n: &'static str) -> Result<ResolvedValue<'c>> {
+    __get_data_from(cmd.data.name.clone(), &cmd.data.options(), n)
 }
 
-pub fn get_attachment<'cmd>(opts: &'cmd [ResolvedOption], name: &str) -> Result<&'cmd Attachment> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::Attachment(a)) => Ok(a),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
+macro_rules! get_data_from {
+    ($name:ident, $variant:path => $result:ty) => {
+        pub fn $name<'c>(c: String, o: &[ResolvedOption<'c>], n: &'static str) -> Result<$result> {
+            match __get_data_from(c.clone(), o, n)? {
+                $variant(v) => Ok(v.to_owned()),
+                _ => Err(Error::InvalidCommandData(c, n)),
+            }
+        }
+    };
 }
-pub fn get_autocomplete<'cmd>(
-    opts: &'cmd [ResolvedOption],
-    name: &str,
-) -> Result<(CommandOptionType, &'cmd str)> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::Autocomplete { kind, value }) => Ok((*kind, value)),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
+macro_rules! get_data {
+    ($name:ident, $variant:path => $result:ty) => {
+        pub fn $name<'c>(cmd: &'c CommandInteraction, n: &'static str) -> Result<$result> {
+            match __get_data(cmd, n)? {
+                $variant(v) => Ok(v.to_owned()),
+                _ => Err(Error::InvalidCommandData(cmd.data.name.clone(), n)),
+            }
+        }
+    };
 }
-pub fn get_bool(opts: &[ResolvedOption], name: &str) -> Result<bool> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::Boolean(b)) => Ok(*b),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_channel<'cmd>(opts: &'cmd [ResolvedOption], name: &str) -> Result<&'cmd PartialChannel> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::Channel(c)) => Ok(c),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_i64(opts: &[ResolvedOption], name: &str) -> Result<i64> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::Integer(i)) => Ok(*i),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_f64(opts: &[ResolvedOption], name: &str) -> Result<f64> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::Number(n)) => Ok(*n),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_role<'cmd>(opts: &'cmd [ResolvedOption], name: &str) -> Result<&'cmd Role> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::Role(r)) => Ok(r),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_str<'cmd>(opts: &'cmd [ResolvedOption], name: &str) -> Result<&'cmd str> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::String(s)) => Ok(s),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_subcommand<'cmd>(
-    opts: &'cmd [ResolvedOption],
-    name: &str,
-) -> Result<&'cmd Vec<ResolvedOption<'cmd>>> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::SubCommand(v)) => Ok(v),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_subcommand_group<'cmd>(
-    opts: &'cmd [ResolvedOption],
-    name: &str,
-) -> Result<&'cmd Vec<ResolvedOption<'cmd>>> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::SubCommandGroup(v)) => Ok(v),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
-    }
-}
-pub fn get_user<'cmd>(
-    opts: &'cmd [ResolvedOption],
-    name: &str,
-) -> Result<(&'cmd User, Option<&'cmd PartialMember>)> {
-    match __get_data(opts, name) {
-        Ok(ResolvedValue::User(u, g)) => Ok((u, g.as_ref().copied())),
-        Err(e) => Err(e),
-        _ => Err(Error::InvalidCommandData),
+
+get_data_from!(get_bool_from, ResolvedValue::Boolean => bool);
+get_data_from!(get_channel_from, ResolvedValue::Channel => PartialChannel);
+get_data_from!(get_i64_from, ResolvedValue::Integer => i64);
+get_data_from!(get_f64_from, ResolvedValue::Number => f64);
+get_data_from!(get_role_from, ResolvedValue::Role => Role);
+get_data_from!(get_str_from, ResolvedValue::String => String);
+get_data_from!(get_subcommand_from, ResolvedValue::SubCommand => Vec<ResolvedOption<'c>>);
+get_data_from!(get_subcommand_group_from, ResolvedValue::SubCommandGroup => Vec<ResolvedOption<'c>>);
+
+get_data!(get_bool, ResolvedValue::Boolean => bool);
+get_data!(get_channel, ResolvedValue::Channel => PartialChannel);
+get_data!(get_i64, ResolvedValue::Integer => i64);
+get_data!(get_f64, ResolvedValue::Number => f64);
+get_data!(get_role, ResolvedValue::Role => Role);
+get_data!(get_str, ResolvedValue::String => String);
+get_data!(get_subcommand, ResolvedValue::SubCommand => Vec<ResolvedOption<'c>>);
+get_data!(get_subcommand_group, ResolvedValue::SubCommandGroup => Vec<ResolvedOption<'c>>);
+
+pub fn get_user(
+    cmd: &CommandInteraction,
+    n: &'static str,
+) -> Result<(User, Option<PartialMember>)> {
+    match __get_data(cmd, n)? {
+        ResolvedValue::User(a, b) => Ok((a.clone(), b.cloned())),
+        _ => Err(Error::InvalidCommandData(cmd.data.name.clone(), n)),
     }
 }

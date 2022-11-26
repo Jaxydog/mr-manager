@@ -2,4 +2,5 @@
 /logs
 /target
 .env
+/*.old
 *.old.*

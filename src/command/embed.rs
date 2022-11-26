@@ -1,60 +1,47 @@
-use serenity::{
-    builder::{
-        CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter,
-        CreateInteractionResponse, CreateInteractionResponseMessage,
-    },
-    model::{
-        prelude::{command::CommandOptionType, CommandInteraction},
-        Color, Permissions,
-    },
-    prelude::Context,
-};
-
-use crate::{utility::Result, DEFAULT_COLOR};
-
-use super::{get_bool, get_str};
+use crate::prelude::*;
 
 pub const NAME: &str = "embed";
-pub const AUTHOR_ICON_NAME: &str = "author_icon";
-pub const AUTHOR_NAME_NAME: &str = "author_name";
-pub const AUTHOR_URL_NAME: &str = "author_url";
-pub const COLOR_NAME: &str = "color";
-pub const DESCRIPTION_NAME: &str = "description";
-pub const FOOTER_ICON_NAME: &str = "footer_icon";
-pub const FOOTER_TEXT_NAME: &str = "footer_text";
-pub const IMAGE_NAME: &str = "image";
-pub const THUMBNAIL_NAME: &str = "thumbnail";
-pub const TITLE_NAME: &str = "title";
-pub const URL_NAME: &str = "url";
-pub const EPHEMERAL_NAME: &str = "ephemeral";
+pub const AUTHOR_ICON: &str = "author_icon";
+pub const AUTHOR_LINK: &str = "author_link";
+pub const AUTHOR_NAME: &str = "author_name";
+pub const COLOR: &str = "color";
+pub const DESCRIPTION: &str = "description";
+pub const FOOTER_ICON: &str = "footer_icon";
+pub const FOOTER_TEXT: &str = "footer_text";
+pub const IMAGE: &str = "image";
+pub const THUMBNAIL: &str = "thumbnail";
+pub const TITLE_TEXT: &str = "title_text";
+pub const TITLE_LINK: &str = "title_link";
+pub const EPHEMERAL: &str = "ephemeral";
 
-pub fn register() -> CreateCommand {
+pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
-        .description("Creates a message embed")
-        .default_member_permissions(Permissions::EMBED_LINKS.union(Permissions::SEND_MESSAGES))
+        .description("Creates an embedded message")
+        .default_member_permissions(Permissions::EMBED_LINKS)
         .dm_permission(false)
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            AUTHOR_ICON_NAME,
-            "The embed author's icon URL",
+            AUTHOR_ICON,
+            "The embed author's icon link",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            AUTHOR_LINK,
+            "The embed author's link",
         ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                AUTHOR_NAME_NAME,
+                AUTHOR_NAME,
                 "The embed author's name",
             )
             .max_length(256)
             .clone(),
         )
-        .add_option(CreateCommandOption::new(
-            CommandOptionType::String,
-            AUTHOR_URL_NAME,
-            "The embed author's URL",
-        ))
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, COLOR_NAME, "The embed's color")
-                .add_string_choice("Default", DEFAULT_COLOR.hex())
+            CreateCommandOption::new(CommandOptionType::String, COLOR, "The embed's color")
+                .add_string_choice("Default", BOT_COLOR.hex())
+                .add_string_choice("User", String::new())
                 .add_string_choice("Red", Color::RED.hex())
                 .add_string_choice("Orange", Color::ORANGE.hex())
                 .add_string_choice("Yellow", Color::GOLD.hex())
@@ -79,21 +66,21 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                DESCRIPTION_NAME,
-                "The embed's description",
+                DESCRIPTION,
+                "The embed's description (supports newline and markdown)",
             )
             .max_length(4096)
             .clone(),
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            FOOTER_ICON_NAME,
-            "The embed footer's icon URL",
+            FOOTER_ICON,
+            "The embed footer's icon link",
         ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                FOOTER_TEXT_NAME,
+                FOOTER_TEXT,
                 "The embed footer's text",
             )
             .max_length(2048)
@@ -101,112 +88,126 @@ pub fn register() -> CreateCommand {
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            IMAGE_NAME,
-            "The embed's image URL",
+            IMAGE,
+            "The embed's image link",
         ))
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            THUMBNAIL_NAME,
-            "The embed's thumbnail URL",
+            THUMBNAIL,
+            "The embed's thumbnail link",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            TITLE_LINK,
+            "The embed title's link",
         ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                TITLE_NAME,
-                "The embed footer's text",
+                TITLE_TEXT,
+                "The embed title's text",
             )
-            .max_length(256)
+            .max_length(2048)
             .clone(),
         )
         .add_option(CreateCommandOption::new(
-            CommandOptionType::String,
-            URL_NAME,
-            "The embed's URL",
-        ))
-        .add_option(CreateCommandOption::new(
-            CommandOptionType::String,
-            EPHEMERAL_NAME,
-            "Whether to make the embed ephemeral",
+            CommandOptionType::Boolean,
+            EPHEMERAL,
+            "Whether the embed is ephemeral (only visible to you)",
         ))
 }
 
-pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let opts = &cmd.data.options();
+pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
     let mut embed = CreateEmbed::new();
+    let mut length = 0;
     let mut valid = false;
 
-    if let Ok(name) = get_str(opts, AUTHOR_NAME_NAME) {
-        let mut author = CreateEmbedAuthor::new(name);
+    if let Ok(name) = get_str(cmd, AUTHOR_NAME) {
+        let mut author = CreateEmbedAuthor::new(&name);
 
-        if let Ok(icon_url) = get_str(opts, AUTHOR_ICON_NAME) {
+        if let Ok(icon_url) = get_str(cmd, AUTHOR_ICON) {
             author = author.icon_url(icon_url);
         }
-        if let Ok(url) = get_str(opts, AUTHOR_URL_NAME) {
+        if let Ok(url) = get_str(cmd, AUTHOR_LINK) {
             author = author.url(url);
         }
 
         embed = embed.author(author);
+        length += name.chars().count();
         valid = true;
     }
 
-    if let Ok(hex) = get_str(opts, COLOR_NAME) {
-        let color = u32::from_str_radix(hex, 16).ok().map(Color::new);
-        embed = embed.color(color.unwrap_or(DEFAULT_COLOR));
+    if let Ok(hex) = get_str(cmd, COLOR) {
+        let color = if hex.is_empty() {
+            let user = ctx.http.get_user(cmd.user.id).await?;
+            user.accent_colour
+        } else {
+            u32::from_str_radix(&hex, 16).ok().map(Color::new)
+        };
+
+        embed = embed.color(color.unwrap_or(BOT_COLOR));
     }
 
-    if let Ok(description) = get_str(opts, DESCRIPTION_NAME) {
-        embed = embed.description(description);
+    if let Ok(description) = get_str(cmd, DESCRIPTION) {
+        embed = embed.description(&description);
+        length += description.chars().count();
         valid = true;
     }
 
-    if let Ok(text) = get_str(opts, FOOTER_TEXT_NAME) {
-        let mut footer = CreateEmbedFooter::new(text);
+    if let Ok(text) = get_str(cmd, FOOTER_TEXT) {
+        let mut footer = CreateEmbedFooter::new(&text);
 
-        if let Ok(icon_url) = get_str(opts, FOOTER_ICON_NAME) {
+        if let Ok(icon_url) = get_str(cmd, FOOTER_ICON) {
             footer = footer.icon_url(icon_url);
         }
 
         embed = embed.footer(footer);
+        length += text.chars().count();
         valid = true;
     }
 
-    if let Ok(url) = get_str(opts, IMAGE_NAME) {
+    if let Ok(url) = get_str(cmd, IMAGE) {
         embed = embed.image(url);
         valid = true;
     }
 
-    if let Ok(url) = get_str(opts, THUMBNAIL_NAME) {
+    if let Ok(url) = get_str(cmd, THUMBNAIL) {
         embed = embed.thumbnail(url);
         valid = true;
     }
 
-    if let Ok(title) = get_str(opts, TITLE_NAME) {
-        embed = embed.title(title);
-
-        if let Ok(url) = get_str(opts, URL_NAME) {
+    if let Ok(title) = get_str(cmd, TITLE_TEXT) {
+        if let Ok(url) = get_str(cmd, TITLE_LINK) {
             embed = embed.url(url);
         }
 
+        embed = embed.title(&title);
+        length += title.chars().count();
         valid = true;
     }
 
     if !valid {
         embed = CreateEmbed::new()
-            .color(DEFAULT_COLOR)
-            .title("Invalid parameters!");
+            .color(BOT_COLOR)
+            .description("At least one visible element must be provided")
+            .title("Invalid arguments!");
+    } else if length > 6000 {
+        embed = CreateEmbed::new()
+            .color(BOT_COLOR)
+            .description("A maximum of 6000 total characters is allowed")
+            .title("Invalid character count!");
     }
 
-    let ephemeral = !valid || get_bool(opts, EPHEMERAL_NAME).unwrap_or_default();
+    let ephemeral = !valid || length > 6000 || get_bool(cmd, EPHEMERAL).unwrap_or_default();
 
     cmd.create_response(
-        &ctx.http,
+        ctx,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .embed(embed)
                 .ephemeral(ephemeral),
         ),
     )
-    .await?;
-
-    Ok(())
+    .await
+    .map_err(Error::from)
 }

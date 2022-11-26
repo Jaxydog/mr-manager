@@ -1,36 +1,21 @@
-use serenity::{
-    builder::{
-        CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedAuthor,
-        CreateInteractionResponse, CreateInteractionResponseMessage,
-    },
-    model::{
-        prelude::{command::CommandOptionType, CommandInteraction},
-        Permissions,
-    },
-    prelude::{CacheHttp, Context},
-};
+use crate::prelude::*;
 
-use crate::{
-    utility::{to_unix_str, Result},
-    DEFAULT_COLOR,
-};
-
-use super::{get_i64, get_str};
+pub struct Offer;
 
 pub const NAME: &str = "offer";
-pub const GIVE_NAME: &str = "give";
-pub const WANT_NAME: &str = "want";
-pub const TIME_NAME: &str = "time";
+const OFFER: &str = "offer";
+const PRICE: &str = "price";
+const MINUTES: &str = "minutes";
 
-pub fn register() -> CreateCommand {
+pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
-        .description("Creates a trade offer")
         .default_member_permissions(Permissions::SEND_MESSAGES)
+        .description("Create a trade offer")
         .dm_permission(false)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                GIVE_NAME,
+                OFFER,
                 "What are you giving away?",
             )
             .max_length(256)
@@ -40,7 +25,7 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                WANT_NAME,
+                PRICE,
                 "What do you want in return?",
             )
             .max_length(256)
@@ -50,8 +35,8 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::Integer,
-                TIME_NAME,
-                "For how long is this offer valid (in minutes)?",
+                MINUTES,
+                "For how long is this valid?",
             )
             .max_int_value(14400)
             .min_int_value(5)
@@ -59,28 +44,24 @@ pub fn register() -> CreateCommand {
         )
 }
 
-pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
     let user = ctx.http().get_user(cmd.user.id).await?;
-    let opts = &cmd.data.options();
+    let offer = get_str(cmd, OFFER)?;
+    let price = get_str(cmd, PRICE)?;
+    let minutes = get_i64(cmd, MINUTES)?;
 
-    let give = get_str(opts, GIVE_NAME)?;
-    let want = get_str(opts, WANT_NAME)?;
-    let mins = get_i64(opts, TIME_NAME)?;
-    let time = to_unix_str(mins * 60 * 1000, "R");
-
+    let time = timestamp_str(minutes * 60 * 1000, "R");
+    let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
     let embed = CreateEmbed::new()
-        .author(CreateEmbedAuthor::new(user.tag()).icon_url(user.face()))
-        .color(user.accent_colour.unwrap_or(DEFAULT_COLOR))
+        .author(author)
+        .color(user.accent_colour.unwrap_or(BOT_COLOR))
         .description(format!("**Offer expires:** {time}"))
-        .field("Offer", give, false)
-        .field("Price", want, false)
-        .thumbnail(cmd.user.face());
+        .field("Offer", offer, false)
+        .field("Price", price, false)
+        .thumbnail(user.face());
 
-    cmd.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().embed(embed)),
-    )
-    .await?;
-
-    Ok(())
+    let message = CreateInteractionResponseMessage::new().embed(embed);
+    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        .await
+        .map_err(Error::from)
 }

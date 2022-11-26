@@ -1,40 +1,31 @@
-use serenity::{
-    builder::{
-        CreateCommand, CreateEmbed, CreateEmbedAuthor, CreateInteractionResponse,
-        CreateInteractionResponseMessage,
-    },
-    model::{prelude::CommandInteraction, Permissions},
-    prelude::Context,
-};
-
-use crate::{utility::Result, DEFAULT_COLOR};
+use crate::prelude::*;
 
 pub const NAME: &str = "data";
 
-pub fn register() -> CreateCommand {
+pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
-        .description("Displays information about data privacy and usage")
+        .description("Displays information about data usage and privacy")
         .default_member_permissions(Permissions::USE_APPLICATION_COMMANDS)
         .dm_permission(true)
 }
 
-pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
     let user = ctx.http.get_current_user().await?;
+    let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
     let embed = CreateEmbed::new()
-        .author(CreateEmbedAuthor::new(user.tag()).icon_url(user.face()))
-        .color(DEFAULT_COLOR)
+        .author(author)
+        .color(BOT_COLOR)
         .description(include_str!(r"..\include\data.txt"))
-        .title("About Stored Data");
+        .title("Data Usage and Privacy");
 
     cmd.create_response(
-        &ctx.http,
+        ctx,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .embed(embed)
                 .ephemeral(true),
         ),
     )
-    .await?;
-
-    Ok(())
+    .await
+    .map_err(Error::from)
 }

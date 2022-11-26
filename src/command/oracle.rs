@@ -1,75 +1,83 @@
 use rand::{thread_rng, Rng};
-use serenity::{
-    builder::{
-        CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedAuthor,
-        CreateInteractionResponse, CreateInteractionResponseMessage,
-    },
-    model::{
-        prelude::{command::CommandOptionType, CommandInteraction},
-        Color, Permissions,
-    },
-    prelude::{CacheHttp, Context},
-};
 
-use crate::utility::Result;
-
-use super::get_str;
+use crate::prelude::*;
 
 pub const NAME: &str = "oracle";
-pub const QUERY_NAME: &str = "query";
-
-const ANSWERS: [Answer<'static>; 20] = [
-    Answer(Mood::Positive, "It is certain."),
-    Answer(Mood::Positive, "It is decidedly so."),
-    Answer(Mood::Positive, "Without a doubt."),
-    Answer(Mood::Positive, "Yes, definitely."),
-    Answer(Mood::Positive, "You may rely on it."),
-    Answer(Mood::Positive, "As I see it, yes."),
-    Answer(Mood::Positive, "Most likely."),
-    Answer(Mood::Positive, "Outlook good."),
-    Answer(Mood::Positive, "Yes."),
-    Answer(Mood::Positive, "Signs point to yes."),
-    Answer(Mood::Neutral, "Reply hazy, try again."),
-    Answer(Mood::Neutral, "Ask again later."),
-    Answer(Mood::Neutral, "Better not tell you now."),
-    Answer(Mood::Neutral, "Cannot predict now."),
-    Answer(Mood::Neutral, "Concentrate and ask again."),
-    Answer(Mood::Negative, "Don't count on it."),
-    Answer(Mood::Negative, "My reply is no."),
-    Answer(Mood::Negative, "My sources say no."),
-    Answer(Mood::Negative, "Outlook not so good."),
-    Answer(Mood::Negative, "Very doubtful."),
+pub const QUERY: &str = "question";
+pub const ORACLE_URL: &str =
+    "https://cdn.discordapp.com/attachments/730389830877577267/1044068278479355954/image.png";
+pub const ANSWERS: [Answer; 20] = [
+    Answer::new(Mood::Positive, "It is certain."),
+    Answer::new(Mood::Positive, "It is decidedly so."),
+    Answer::new(Mood::Positive, "Without a doubt."),
+    Answer::new(Mood::Positive, "Yes, definitely."),
+    Answer::new(Mood::Positive, "You may rely on it."),
+    Answer::new(Mood::Positive, "As I see it, yes."),
+    Answer::new(Mood::Positive, "Most likely."),
+    Answer::new(Mood::Positive, "Outlook good."),
+    Answer::new(Mood::Positive, "Yes."),
+    Answer::new(Mood::Positive, "Signs point to yes."),
+    Answer::new(Mood::Neutral, "Reply hazy, try again."),
+    Answer::new(Mood::Neutral, "Ask again later."),
+    Answer::new(Mood::Neutral, "Better not tell you now."),
+    Answer::new(Mood::Neutral, "Cannot predict now."),
+    Answer::new(Mood::Neutral, "Concentrate and ask again."),
+    Answer::new(Mood::Negative, "Don't count on it."),
+    Answer::new(Mood::Negative, "My reply is no."),
+    Answer::new(Mood::Negative, "My sources say no."),
+    Answer::new(Mood::Negative, "Outlook not so good."),
+    Answer::new(Mood::Negative, "Very doubtful."),
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Mood {
+#[derive(Clone, Copy, Debug)]
+pub enum Mood {
     Negative,
     Neutral,
     Positive,
 }
 
-impl Mood {
-    const fn get_color(self) -> Color {
-        match self {
-            Self::Negative => Color::RED,
-            Self::Neutral => Color::GOLD,
-            Self::Positive => Color::KERBAL,
-        }
+#[derive(Clone, Copy, Debug)]
+pub struct Answer {
+    pub mood: Mood,
+    pub text: &'static str,
+}
+
+impl Answer {
+    #[must_use]
+    pub const fn new(mood: Mood, text: &'static str) -> Self {
+        Self { mood, text }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Answer<'a>(Mood, &'a str);
+#[async_trait]
+impl MakeEmbed for Answer {
+    type Args = (String, String);
 
-pub fn register() -> CreateCommand {
+    async fn make_embed(&self, _: &Context, (name, query): Self::Args) -> Result<CreateEmbed> {
+        let author = CreateEmbedAuthor::new("The Oracle").icon_url(ORACLE_URL);
+        let description = format!("**{name} asked...**\n> {query}\n\n*{}*", self.text);
+        let color = match self.mood {
+            Mood::Negative => Color::RED,
+            Mood::Neutral => Color::GOLD,
+            Mood::Positive => Color::KERBAL,
+        };
+
+        Ok(CreateEmbed::new()
+            .author(author)
+            .color(color)
+            .description(description))
+    }
+}
+
+pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
-        .description("Asks the oracle a question")
-        .default_member_permissions(Permissions::USE_APPLICATION_COMMANDS)
+        .description("Asks the Oracle a question")
+        .default_member_permissions(Permissions::SEND_MESSAGES)
         .dm_permission(false)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                QUERY_NAME,
+                QUERY,
                 "What would you like to ask?",
             )
             .max_length(512)
@@ -78,22 +86,15 @@ pub fn register() -> CreateCommand {
         )
 }
 
-pub async fn run(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let name = cmd.user.id.to_user(ctx.http()).await?.tag();
-    let opts = &cmd.data.options();
-    let query = get_str(opts, QUERY_NAME)?;
+pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+    let name = cmd.user.id.to_user(ctx).await?.tag();
+    let query = get_str(cmd, QUERY)?;
     let index = thread_rng().gen_range(0..ANSWERS.len());
     let reply = ANSWERS[index];
+    let embed = reply.make_embed(ctx, (name, query.to_string())).await?;
 
-    let embed = CreateEmbed::new().author(CreateEmbedAuthor::new("The Oracle").icon_url(
-        "https://cdn.discordapp.com/attachments/730389830877577267/1044068278479355954/image.png",
-    )).color(reply.0.get_color()).description(format!("{name} asked...\n> {query}\n\n*{}*", reply.1));
-
-    cmd.create_response(
-        ctx.http(),
-        CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().embed(embed)),
-    )
-    .await?;
-
-    Ok(())
+    let message = CreateInteractionResponseMessage::new().embed(embed);
+    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        .await
+        .map_err(Error::from)
 }
