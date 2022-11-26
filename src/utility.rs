@@ -69,7 +69,7 @@ pub fn timestamp_str(ms: i64, flag: &str) -> String {
 
 pub type Result<T> = core::result::Result<T, Error>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Anchor {
     guild_id: GuildId,
     channel_id: ChannelId,

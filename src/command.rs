@@ -6,6 +6,8 @@ pub mod help;
 pub mod offer;
 pub mod oracle;
 pub mod ping;
+#[allow(clippy::use_self)]
+pub mod poll;
 pub mod role;
 
 fn __get_data_from<'c>(
