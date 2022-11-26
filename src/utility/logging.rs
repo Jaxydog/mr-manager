@@ -95,7 +95,7 @@ impl Logger {
         })
     }
 
-    fn __log(&mut self, level: Level, text: &str) -> Result<()> {
+    fn __log(&self, level: Level, text: &str) -> Result<()> {
         let log = Log::new(level, text);
 
         if self.enable {
@@ -110,13 +110,13 @@ impl Logger {
         Ok(())
     }
 
-    pub fn info<T: ToString>(&mut self, v: &T) -> Result<()> {
+    pub fn info<T: ToString>(&self, v: &T) -> Result<()> {
         self.__log(Level::Info, &v.to_string())
     }
-    pub fn warn<T: ToString>(&mut self, v: &T) -> Result<()> {
+    pub fn warn<T: ToString>(&self, v: &T) -> Result<()> {
         self.__log(Level::Warn, &v.to_string())
     }
-    pub fn error<T: ToString>(&mut self, v: &T) -> Result<()> {
+    pub fn error<T: ToString>(&self, v: &T) -> Result<()> {
         self.__log(Level::Error, &v.to_string())
     }
 }

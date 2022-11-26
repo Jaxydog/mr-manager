@@ -1,5 +1,3 @@
-use std::sync::{RwLock, RwLockWriteGuard};
-
 use serenity::{
     all::{OnlineStatus, Ready},
     gateway::ActivityData,
@@ -9,30 +7,23 @@ use crate::prelude::*;
 
 #[derive(Debug)]
 pub struct Handler {
-    logger: RwLock<Logger>,
+    logger: Logger,
 }
 
 impl Handler {
     #[must_use]
     pub const fn new(logger: Logger) -> Self {
-        Self {
-            logger: RwLock::new(logger),
-        }
+        Self { logger }
     }
 
-    fn __logger(&self) -> Result<RwLockWriteGuard<Logger>> {
-        self.logger
-            .write()
-            .map_err(|_| Error::Other("Logger has been poisoned"))
-    }
     pub fn info<T: ToString>(&self, v: &T) {
-        self.__logger().and_then(|mut l| l.info(v)).ok();
+        self.logger.info(v).ok();
     }
     pub fn warn<T: ToString>(&self, v: &T) {
-        self.__logger().and_then(|mut l| l.warn(v)).ok();
+        self.logger.warn(v).ok();
     }
     pub fn error<T: ToString>(&self, v: &T) {
-        self.__logger().and_then(|mut l| l.error(v)).ok();
+        self.logger.error(v).ok();
     }
 
     fn __create_commands() -> Vec<CreateCommand> {
