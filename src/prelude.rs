@@ -6,8 +6,9 @@ pub use serde::{Deserialize, Serialize};
 pub use serenity::{
     all::{
         ButtonStyle, Channel, Color, CommandInteraction, CommandOptionType, ComponentInteraction,
-        Guild, Interaction, Member, Message, ModalInteraction, PartialChannel, PartialGuild,
-        PartialMember, Permissions, ReactionType, ResolvedOption, ResolvedValue, Role, User,
+        Guild, GuildChannel, Interaction, Member, Message, ModalInteraction, PartialChannel,
+        PartialGuild, PartialMember, Permissions, ReactionType, ResolvedOption, ResolvedValue,
+        Role, User,
     },
     async_trait,
     builder::*,

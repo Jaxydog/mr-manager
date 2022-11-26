@@ -69,6 +69,41 @@ pub fn timestamp_str(ms: i64, flag: &str) -> String {
 
 pub type Result<T> = core::result::Result<T, Error>;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Anchor {
+    guild_id: GuildId,
+    channel_id: ChannelId,
+    message_id: MessageId,
+}
+
+impl Anchor {
+    pub async fn to_guild(&self, ctx: &Context) -> Result<PartialGuild> {
+        Ok(self.guild_id.to_partial_guild(ctx).await?)
+    }
+    pub async fn to_channel(&self, ctx: &Context) -> Result<GuildChannel> {
+        let guild = self.to_guild(ctx).await?;
+        let mut channels = guild.channels(ctx).await?;
+
+        channels
+            .remove(&self.channel_id)
+            .ok_or(Error::MissingChannel(self.channel_id))
+    }
+    pub async fn to_message(&self, ctx: &Context) -> Result<Message> {
+        let channel = self.to_channel(ctx).await?;
+        Ok(channel.message(ctx, self.message_id).await?)
+    }
+}
+
+impl std::fmt::Display for Anchor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "https://discord.com/channels/{}/{}/{}",
+            self.guild_id, self.channel_id, self.message_id
+        )
+    }
+}
+
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum Error {
