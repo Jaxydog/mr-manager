@@ -57,12 +57,13 @@ get_data!(get_str, ResolvedValue::String => str);
 get_data!(get_subcommand, ResolvedValue::SubCommand => Vec<ResolvedOption<'c>>);
 get_data!(get_subcommand_group, ResolvedValue::SubCommandGroup => Vec<ResolvedOption<'c>>);
 
-// pub fn get_user<'c>(
-//     cmd: &'c CommandInteraction,
-//     n: &'static str,
-// ) -> Result<(&'c User, Option<&'c PartialMember>)> {
-//     match __get_data(cmd, n)? {
-//         ResolvedValue::User(a, b) => Ok((a, *b)),
-//         _ => Err(Error::InvalidCommandData(cmd.data.name.clone(), n)),
-//     }
-// }
+pub fn get_user<'c>(
+    c: &'c str,
+    o: &'c [ResolvedOption<'c>],
+    n: &'static str,
+) -> Result<(&'c User, Option<&'c PartialMember>)> {
+    match __get_data(c, o, n)? {
+        ResolvedValue::User(user, member) => Ok((user, *member)),
+        _ => Err(Error::InvalidCommandData(c.to_string(), n)),
+    }
+}
