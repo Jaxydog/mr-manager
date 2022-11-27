@@ -23,20 +23,32 @@ pub use crate::utility::request::*;
 pub use crate::utility::*;
 
 #[async_trait]
-pub trait MakeEmbed {
+pub trait ToEmbed {
     type Args: Send + Sync;
 
-    async fn make_embed(&self, ctx: &Context, args: Self::Args) -> Result<CreateEmbed>;
+    async fn to_embed(&self, ctx: &Context, args: Self::Args) -> Result<CreateEmbed>;
 }
 #[async_trait]
-pub trait MakeButtons {
+pub trait ToButton {
     type Args: Send + Sync;
 
-    async fn make_buttons(&self, ctx: &Context, args: Self::Args) -> Result<Vec<CreateButton>>;
+    async fn to_button(&self, ctx: &Context, args: Self::Args) -> Result<CreateButton>;
 }
 #[async_trait]
-pub trait MakeMessage {
+pub trait ToButtons {
     type Args: Send + Sync;
 
-    async fn make_message(&self, ctx: &Context, args: Self::Args) -> Result<CreateMessage>;
+    async fn to_buttons(&self, ctx: &Context, args: Self::Args) -> Result<Vec<CreateButton>>;
+}
+#[async_trait]
+pub trait ToMessage {
+    type Args: Send + Sync;
+
+    async fn to_message(&self, ctx: &Context, args: Self::Args) -> Result<CreateMessage>;
+}
+#[async_trait]
+pub trait ToModal {
+    type Args: Send + Sync;
+
+    async fn to_modal(&self, ctx: &Context, args: Self::Args) -> Result<CreateModal>;
 }

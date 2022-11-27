@@ -66,14 +66,22 @@ pub fn timestamp_str(ms: i64, flag: &str) -> String {
 
     format!("<t:{secs}:{flag}>")
 }
+#[must_use]
+pub const fn yes_no(b: bool) -> &'static str {
+    if b {
+        "Yes"
+    } else {
+        "No"
+    }
+}
 
 pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Anchor {
-    guild_id: GuildId,
-    channel_id: ChannelId,
-    message_id: MessageId,
+    pub guild_id: GuildId,
+    pub channel_id: ChannelId,
+    pub message_id: MessageId,
 }
 
 impl Anchor {

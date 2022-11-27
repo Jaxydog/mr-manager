@@ -59,10 +59,10 @@ impl AsRequest for Selector {
 }
 
 #[async_trait]
-impl MakeButtons for Selector {
+impl ToButtons for Selector {
     type Args = bool;
 
-    async fn make_buttons(&self, ctx: &Context, disabled: Self::Args) -> Result<Vec<CreateButton>> {
+    async fn to_buttons(&self, ctx: &Context, disabled: Self::Args) -> Result<Vec<CreateButton>> {
         let roles = ctx.http().get_guild_roles(self.guild_id).await?;
         let mut buttons = vec![];
 
@@ -200,7 +200,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .embed(embed)
             .ephemeral(true);
 
-        for button in selector.make_buttons(ctx, true).await? {
+        for button in selector.to_buttons(ctx, true).await? {
             message = message.button(button);
         }
 
@@ -216,7 +216,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         let embed = CreateEmbed::new().color(BOT_COLOR).title(title);
         let mut message = CreateMessage::new().embed(embed);
 
-        for button in selector.make_buttons(ctx, false).await? {
+        for button in selector.to_buttons(ctx, false).await? {
             message = message.button(button);
         }
 

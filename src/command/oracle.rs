@@ -50,10 +50,10 @@ impl Answer {
 }
 
 #[async_trait]
-impl MakeEmbed for Answer {
+impl ToEmbed for Answer {
     type Args = (String, String);
 
-    async fn make_embed(&self, _: &Context, (name, query): Self::Args) -> Result<CreateEmbed> {
+    async fn to_embed(&self, _: &Context, (name, query): Self::Args) -> Result<CreateEmbed> {
         let author = CreateEmbedAuthor::new("The Oracle").icon_url(ORACLE_URL);
         let description = format!("**{name} asked...**\n> {query}\n\n*{}*", self.text);
         let color = match self.mood {
@@ -92,7 +92,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
     let query = get_str(&cmd.data.name, o, QUERY)?;
     let index = thread_rng().gen_range(0..ANSWERS.len());
     let reply = ANSWERS[index];
-    let embed = reply.make_embed(ctx, (name, query.to_string())).await?;
+    let embed = reply.to_embed(ctx, (name, query.to_string())).await?;
 
     let message = CreateInteractionResponseMessage::new().embed(embed);
     cmd.create_response(ctx, CreateInteractionResponse::Message(message))
