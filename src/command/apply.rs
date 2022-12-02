@@ -197,12 +197,22 @@ impl Form {
     pub async fn update(
         &mut self,
         ctx: &Context,
+        guild: GuildId,
         status: Status,
         reason: Option<impl Send + Sync + Into<String>>,
     ) -> Result<()> {
+        let config = Config::read(guild).await?;
+        let mut member = guild.member(ctx, self.user).await?;
+
         self.status = status;
         self.reason = reason.map(Into::into);
         self.write().await?;
+
+        if status == Status::Accepted {
+            member.add_role(ctx, config.role).await?;
+        } else {
+            member.remove_role(ctx, config.role).await?;
+        }
 
         if let Some(anchor) = self.anchor {
             let mut message = anchor.to_message(ctx).await?;
@@ -705,7 +715,8 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         };
         let status = Status::try_from(status)?;
 
-        form.update(ctx, status, get_str(o, OP_REASON).ok()).await?;
+        form.update(ctx, guild, status, get_str(o, OP_REASON).ok())
+            .await?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
@@ -876,7 +887,7 @@ pub async fn run_modal(ctx: &Context, mdl: &ModalInteraction) -> Result<()> {
             let reason = get_input_text(o, OP_REASON).ok();
             let mut form = Form::read((guild, user)).await?;
 
-            form.update(ctx, status, reason).await?;
+            form.update(ctx, guild, status, reason).await?;
             mdl.create_response(ctx, CreateInteractionResponse::Acknowledge)
                 .await
                 .map_err(Error::from)
