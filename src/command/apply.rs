@@ -45,17 +45,17 @@ pub const TOAST: [&str; 8] = [
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Content {
-    title: String,
-    description: String,
-    thumbnail: String,
-    questions: Vec<String>,
+    pub title: String,
+    pub description: String,
+    pub thumbnail: String,
+    pub questions: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
-    channel: ChannelId,
-    role: RoleId,
-    content: Content,
+    pub channel: ChannelId,
+    pub role: RoleId,
+    pub content: Content,
     anchor: Option<Anchor>,
 }
 
@@ -186,10 +186,10 @@ impl Display for Status {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Form {
-    user: UserId,
-    status: Status,
-    reason: Option<String>,
-    answers: Vec<(usize, String)>,
+    pub user: UserId,
+    pub status: Status,
+    pub reason: Option<String>,
+    pub answers: Vec<(usize, String)>,
     anchor: Option<Anchor>,
 }
 
