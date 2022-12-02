@@ -200,20 +200,22 @@ impl Form {
         status: Status,
         reason: Option<impl Send + Sync + Into<String>>,
     ) -> Result<()> {
-        let anchor = self.anchor()?;
-        let mut message = anchor.to_message(ctx).await?;
-
         self.status = status;
         self.reason = reason.map(Into::into);
         self.write().await?;
 
-        let mut edit = EditMessage::new().embed(self.to_embed(ctx, anchor.guild).await?);
+        if let Some(anchor) = self.anchor {
+            let mut message = anchor.to_message(ctx).await?;
+            let mut edit = EditMessage::new().embed(self.to_embed(ctx, anchor.guild).await?);
 
-        for button in self.to_button_array(status != Status::Pending)? {
-            edit = edit.button(button);
+            for button in self.to_button_array(status != Status::Pending)? {
+                edit = edit.button(button);
+            }
+
+            message.edit(ctx, edit).await?;
         }
 
-        message.edit(ctx, edit).await.map_err(Error::from)
+        Ok(())
     }
 }
 
@@ -244,6 +246,7 @@ impl ToEmbedAsync for Form {
     async fn to_embed(&self, ctx: &Context, guild: Self::Args) -> Result<CreateEmbed> {
         let config = Config::read(guild).await?;
         let user = ctx.http.get_user(self.user).await?;
+
         let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
         let color = user.accent_colour.unwrap_or(BOT_COLOR);
         let title = TOAST[thread_rng().gen_range(0..TOAST.len())];
@@ -719,12 +722,16 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         let (user, _) = get_user(o, OP_USER)?;
 
         let form = Form::read((guild, user.id)).await?;
-        let message = form.anchor()?.to_message(ctx).await?;
         let mut member = guild.member(ctx, user.id).await?;
 
-        member.remove_role(ctx, config.role).await?;
-        message.delete(ctx).await?;
+        if let Some(anchor) = form.anchor.as_ref() {
+            let message = anchor.to_message(ctx).await?;
+
+            message.delete(ctx).await?;
+        }
+
         form.remove().await?;
+        member.remove_role(ctx, config.role).await?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
