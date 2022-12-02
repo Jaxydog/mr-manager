@@ -275,7 +275,7 @@ impl ToEmbedAsync for Form {
             let answer = self
                 .answers
                 .iter()
-                .find_map(|(n, s)| (*n == index).then_some(s.clone()))
+                .find_map(|(n, s)| (*n == index).then_some(format!("> {s}")))
                 .unwrap_or_else(|| "N/A".to_string());
 
             embed = embed.field(question, answer, false);
