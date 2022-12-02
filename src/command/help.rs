@@ -4,9 +4,9 @@ pub const NAME: &str = "help";
 
 pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
-        .description("Displays a list of bot commands")
         .default_member_permissions(Permissions::USE_APPLICATION_COMMANDS)
-        .dm_permission(true)
+        .description("Displays a list of bot commands")
+        .dm_permission(false)
 }
 
 pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
@@ -20,11 +20,12 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         commands.sort_by_key(|c| c.name.clone());
 
         for command in commands {
-            let name = command.name;
-            let id = command.id;
-            let info = command.description;
+            let label = format!(
+                "\n</{}:{}> - {}",
+                command.name, command.id, command.description
+            );
 
-            description.push_str(&format!("\n</{name}:{id}> - {info}"));
+            description.push_str(&label);
         }
 
         description.push('\n');
@@ -37,16 +38,13 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .author(author)
         .color(BOT_COLOR)
         .description(description)
-        .title("Command Menu");
+        .title("Command List");
 
-    cmd.create_response(
-        ctx,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .embed(embed)
-                .ephemeral(true),
-        ),
-    )
-    .await
-    .map_err(Error::from)
+    let message = CreateInteractionResponseMessage::new()
+        .embed(embed)
+        .ephemeral(true);
+
+    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        .await
+        .map_err(Error::from)
 }

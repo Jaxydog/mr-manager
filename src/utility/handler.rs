@@ -1,7 +1,4 @@
-use serenity::{
-    all::{OnlineStatus, Ready},
-    gateway::ActivityData,
-};
+use serenity::{all::OnlineStatus, gateway::ActivityData, prelude::EventHandler};
 
 use crate::prelude::*;
 
@@ -11,23 +8,23 @@ pub struct Handler {
 }
 
 impl Handler {
-    #[must_use]
     pub const fn new(logger: Logger) -> Self {
         Self { logger }
     }
 
-    pub fn info<T: ToString>(&self, v: &T) {
-        self.logger.info(v).ok();
+    pub fn info(&self, s: impl Into<String>) {
+        self.logger.info(s).ok();
     }
-    pub fn warn<T: ToString>(&self, v: &T) {
-        self.logger.warn(v).ok();
+    pub fn warn(&self, s: impl Into<String>) {
+        self.logger.warn(s).ok();
     }
-    pub fn error<T: ToString>(&self, v: &T) {
-        self.logger.error(v).ok();
+    pub fn error(&self, s: impl Into<String>) {
+        self.logger.error(s).ok();
     }
 
     fn __create_commands() -> Vec<CreateCommand> {
-        [
+        vec![
+            apply::new(),
             data::new(),
             embed::new(),
             help::new(),
@@ -36,52 +33,48 @@ impl Handler {
             ping::new(),
             role::new(),
         ]
-        .to_vec()
+    }
+    async fn __update_presence(&self, ctx: &Context) -> Result<()> {
+        let status = if IS_DEV {
+            OnlineStatus::Idle
+        } else {
+            OnlineStatus::DoNotDisturb
+        };
+
+        let activity = if IS_DEV {
+            ActivityData::listening("API events")
+        } else {
+            ActivityData::watching("my employees")
+        };
+
+        let text = format!("{:?} - {}", activity.kind, activity.name);
+
+        ctx.set_presence(Some(activity), status);
+        self.info(format!("Presence: {status:?}, {text}"));
+
+        Ok(())
     }
     async fn __update_commands(&self, ctx: &Context) -> Result<()> {
         let guild_id = dev_guild()?;
         let cmds = Self::__create_commands();
 
-        let global = if is_dev() {
+        let global = if IS_DEV {
             ctx.http.get_global_application_commands().await?
         } else {
             ctx.http.create_global_application_commands(&cmds).await?
         }
         .len();
 
-        self.info(&format!("Global commands: {global}"));
+        self.info(format!("Global commands: {global}"));
 
-        let guild = if is_dev() {
+        let guild = if IS_DEV {
             guild_id.set_application_commands(ctx, cmds).await?
         } else {
             guild_id.get_application_commands(ctx).await?
         }
         .len();
 
-        self.info(&format!("Guild commands: {guild}"));
-
-        Ok(())
-    }
-
-    async fn __update_presence(&self, ctx: &Context) -> Result<()> {
-        let status = if is_dev() {
-            OnlineStatus::Idle
-        } else {
-            OnlineStatus::DoNotDisturb
-        };
-
-        let name = format!("{status:?}");
-
-        let activity = if is_dev() {
-            ActivityData::listening("API events")
-        } else {
-            ActivityData::watching("my employees")
-        };
-
-        let text = format!("{:?}, {}", activity.kind, activity.name);
-
-        ctx.set_presence(Some(activity), status);
-        self.info(&format!("Presence: {name}; {text}"));
+        self.info(format!("Guild commands: {guild}"));
 
         Ok(())
     }
@@ -90,84 +83,93 @@ impl Handler {
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        self.info(&format!("Connected: {}", ready.user.tag()));
+        self.info(format!("Connected: {}", ready.user.tag()));
 
         if let Some(n) = ready.shard.map(|s| s.total) {
-            self.info(&format!("Shard count: {n}"));
+            self.info(format!("Shards: {n}"));
         }
         if let Err(e) = self.__update_presence(&ctx).await {
-            self.warn(&e.to_string());
+            self.warn(e.to_string());
         }
         if let Err(e) = self.__update_commands(&ctx).await {
-            self.warn(&e.to_string());
+            self.warn(e.to_string());
         }
     }
     async fn interaction_create(&self, ctx: Context, mut int: Interaction) {
-        let name = format!("{:?}<{}>", int.kind(), int.id());
-        self.info(&format!("Received: {name}"));
+        let id = match &int {
+            Interaction::Autocomplete(i) | Interaction::Command(i) => {
+                format!("{}#{}", i.data.name, i.id)
+            }
+            Interaction::Component(i) => format!("{}.{}", i.data.custom_id, i.id),
+            Interaction::Modal(i) => format!("{}.{}", i.data.custom_id, i.id),
+            Interaction::Ping(i) => format!("{}.{}", i.token, i.id),
+        };
+        let name = format!("{:?}<{id}>", int.kind());
 
-        let result = match &mut int {
-            Interaction::Command(cmd) => match cmd.data.name.as_str() {
-                data::NAME => data::run_command(&ctx, cmd).await,
-                embed::NAME => embed::run_command(&ctx, cmd).await,
-                help::NAME => help::run_command(&ctx, cmd).await,
-                offer::NAME => offer::run_command(&ctx, cmd).await,
-                oracle::NAME => oracle::run_command(&ctx, cmd).await,
-                ping::NAME => ping::run_command(&ctx, cmd).await,
-                role::NAME => role::run_command(&ctx, cmd).await,
-                _ => Err(Error::InvalidCommand(cmd.data.name.clone())),
+        self.info(format!("Received: {name}"));
+
+        let result: Result<()> = match &mut int {
+            Interaction::Command(i) => match i.data.name.as_str() {
+                apply::NAME => apply::run_command(&ctx, i).await,
+                data::NAME => data::run_command(&ctx, i).await,
+                embed::NAME => embed::run_command(&ctx, i).await,
+                help::NAME => help::run_command(&ctx, i).await,
+                offer::NAME => offer::run_command(&ctx, i).await,
+                oracle::NAME => oracle::run_command(&ctx, i).await,
+                ping::NAME => ping::run_command(&ctx, i).await,
+                role::NAME => role::run_command(&ctx, i).await,
+                _ => Err(Error::InvalidValue(Value::Command, id)),
             },
-            Interaction::Component(cpn) => match parse_cid(&cpn.data.custom_id) {
-                Ok((_, name, _)) => match name.as_str() {
-                    role::NAME => role::run_component(&ctx, cpn).await,
-                    _ => Err(Error::InvalidComponent(cpn.data.custom_id.clone())),
+            Interaction::Component(i) => match CustomId::try_from(i.data.custom_id.as_str()) {
+                Ok(c) => match c.base.as_str() {
+                    apply::NAME => apply::run_component(&ctx, i).await,
+                    role::NAME => role::run_component(&ctx, i).await,
+                    _ => Err(Error::InvalidValue(Value::Component, id)),
                 },
                 Err(e) => Err(e),
             },
-            Interaction::Modal(mdl) => match parse_cid(&mdl.data.custom_id) {
-                Ok((_, name, _)) => match name.as_str() {
-                    _ => Err(Error::InvalidComponent(mdl.data.custom_id.clone())),
+            Interaction::Modal(i) => match CustomId::try_from(i.data.custom_id.as_str()) {
+                Ok(c) => match c.base.as_str() {
+                    apply::NAME => apply::run_modal(&ctx, i).await,
+                    _ => Err(Error::InvalidValue(Value::Modal, id)),
                 },
                 Err(e) => Err(e),
             },
-            _ => Err(Error::InvalidInteraction(int.id())),
+            _ => Err(Error::InvalidValue(
+                Value::Interaction,
+                int.id().to_string(),
+            )),
         };
 
         if let Err(error) = result {
-            self.error(&format!("Failed: {name}, {error}"));
+            self.error(format!("Failed: {name} - {error}"));
 
             let embed = CreateEmbed::new()
                 .color(BOT_COLOR)
                 .description(format!("> {error}"))
-                .title("An error occurred!");
-
-            let response = CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            );
+                .title("Encountered an error!");
+            let message = CreateInteractionResponseMessage::new()
+                .embed(embed)
+                .ephemeral(true);
+            let reply = CreateInteractionResponse::Message(message);
 
             let result = match &int {
-                Interaction::Command(cmd) => cmd
-                    .create_response(ctx, response)
-                    .await
-                    .map_err(Error::from),
-                Interaction::Component(cpn) => cpn
-                    .create_response(ctx, response)
-                    .await
-                    .map_err(Error::from),
-                Interaction::Modal(mdl) => mdl
-                    .create_response(ctx, response)
-                    .await
-                    .map_err(Error::from),
-                _ => Ok(()),
+                Interaction::Command(i) => i.create_response(ctx, reply).await.map_err(Error::from),
+                Interaction::Component(i) => {
+                    i.create_response(ctx, reply).await.map_err(Error::from)
+                }
+                Interaction::Modal(i) => i.create_response(ctx, reply).await.map_err(Error::from),
+                _ => Err(Error::InvalidValue(
+                    Value::Interaction,
+                    format!("{:?}", int.kind()),
+                )),
             };
 
-            if let Err(failed) = result {
-                self.error(&format!("Unable to inform: {failed}"));
+            if let Err(error) = result {
+                self.warn(format!("Silent error: {error}"));
             }
         } else {
-            self.info(&format!("Success: {name}"));
+            self.info(format!("Succeeded: {name}"));
         }
     }
 }

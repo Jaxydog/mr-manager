@@ -2,123 +2,110 @@ use crate::prelude::*;
 
 pub const NAME: &str = "role";
 
-pub const CREATE: &str = "create";
-pub const REMOVE: &str = "remove";
-pub const LIST: &str = "list";
-pub const SEND: &str = "send";
+pub const CM_TOGGLE: &str = formatcp!("{NAME}_toggle");
 
-pub const ROLE: &str = "role";
-pub const ICON: &str = "icon";
-pub const TITLE: &str = "title";
+pub const SC_CREATE: &str = "create";
+pub const SC_REMOVE: &str = "remove";
+pub const SC_LIST: &str = "list";
+pub const SC_SEND: &str = "send";
 
-pub const TOGGLE: &str = formatcp!("{NAME}_toggle");
+pub const OP_ROLE: &str = "role";
+pub const OP_ICON: &str = "icon";
+pub const OP_TEXT: &str = "text";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Toggle {
-    pub role_id: RoleId,
+    pub role: RoleId,
     pub icon: ReactionType,
 }
 
-impl Toggle {
-    #[must_use]
-    pub const fn new(role_id: RoleId, icon: ReactionType) -> Self {
-        Self { role_id, icon }
+#[async_trait]
+impl ToButtonAsync for Toggle {
+    type Args = (GuildId, bool);
+
+    async fn to_button(
+        &self,
+        ctx: &Context,
+        (guild, disabled): Self::Args,
+    ) -> Result<CreateButton> {
+        let mut roles = guild.roles(ctx).await?;
+        let Some(role) = roles.remove(&self.role) else {
+			return Err(Error::InvalidId(Value::Role, self.role.to_string()))
+		};
+
+        let custom_id = CustomId::new(CM_TOGGLE).arg(self.role.to_string());
+
+        Ok(CreateButton::new(custom_id.to_string())
+            .disabled(disabled)
+            .emoji(self.icon.clone())
+            .label(role.name)
+            .style(ButtonStyle::Secondary))
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Selector {
-    pub user_id: UserId,
-    pub guild_id: GuildId,
-    pub toggles: Vec<Toggle>,
+    pub user: UserId,
+    pub guild: GuildId,
+    pub roles: Vec<Toggle>,
 }
 
 impl Selector {
-    #[must_use]
-    pub const fn new(user_id: UserId, guild_id: GuildId) -> Self {
-        Self {
-            user_id,
-            guild_id,
-            toggles: vec![],
-        }
+    pub const fn new(user: UserId, guild: GuildId) -> Self {
+        let roles = vec![];
+
+        Self { user, guild, roles }
     }
 }
 
-impl Request for Selector {
+impl NewReq for Selector {
     type Args = (GuildId, UserId);
 
-    fn req((guild_id, user_id): Self::Args) -> Req<Self> {
-        Req::new(format!("{NAME}/{guild_id}"), user_id.to_string())
+    fn new_req((guild, user): Self::Args) -> Req<Self> {
+        Req::new(format!("{NAME}/{guild}"), user.to_string())
     }
 }
 
-impl AsRequest for Selector {
+impl AsReq for Selector {
     fn as_req(&self) -> Req<Self> {
-        Self::req((self.guild_id, self.user_id))
-    }
-}
-
-#[async_trait]
-impl ToButtons for Selector {
-    type Args = bool;
-
-    async fn to_buttons(&self, ctx: &Context, disabled: Self::Args) -> Result<Vec<CreateButton>> {
-        let roles = ctx.http().get_guild_roles(self.guild_id).await?;
-        let mut buttons = vec![];
-
-        for toggle in self.toggles.iter().take(25) {
-            let Some(role) = roles.iter().find(|r| r.id == toggle.role_id) else {
-				continue;
-			};
-
-            let custom_id = format!("{TOGGLE};{}", role.id);
-            let button = CreateButton::new(custom_id)
-                .disabled(disabled)
-                .emoji(toggle.icon.clone())
-                .label(&role.name)
-                .style(ButtonStyle::Secondary);
-
-            buttons.push(button);
-        }
-
-        Ok(buttons)
+        Self::new_req((self.guild, self.user))
     }
 }
 
 pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
-        .description("Create or manage role selectors")
         .default_member_permissions(Permissions::MANAGE_ROLES)
+        .description("Create or manage role selectors")
         .dm_permission(false)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
-                CREATE,
+                SC_CREATE,
                 "Creates a new role selector",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::Role,
-                    ROLE,
+                    OP_ROLE,
                     "The selector's linked role",
                 )
                 .required(true),
             )
             .add_sub_option(
-                CreateCommandOption::new(CommandOptionType::String, ICON, "The selector's icon")
+                CreateCommandOption::new(CommandOptionType::String, OP_ICON, "The selector's icon")
                     .required(true),
             ),
         )
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
-                REMOVE,
+                SC_REMOVE,
                 "Deletes a role selector",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::Role,
-                    ROLE,
+                    OP_ROLE,
                     "The selector's linked role",
                 )
                 .required(true),
@@ -126,51 +113,52 @@ pub fn new() -> CreateCommand {
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::SubCommand,
-            LIST,
+            SC_LIST,
             "Lists all current role selectors",
         ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
-                SEND,
+                SC_SEND,
                 "Sends the current roles selectors",
             )
-            .add_sub_option(CreateCommandOption::new(
-                CommandOptionType::String,
-                TITLE,
-                "The title of the role selectors",
-            )),
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    OP_TEXT,
+                    "The title of the role selector's embed",
+                )
+                .max_length(256)
+                .clone()
+                .required(true),
+            ),
         )
 }
 
 pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let Some(guild_id) = cmd.guild_id else {
-		return Err(Error::Other("Missing guild identifier"))
+    let Some(guild) = cmd.guild_id else {
+		return Err(Error::MissingValue(Value::Guild));
 	};
 
-    let req = Selector::req((guild_id, cmd.user.id));
-    let mut selector = req
-        .read()
-        .await
-        .unwrap_or_else(|_| Selector::new(cmd.user.id, guild_id));
-
-    let c = &cmd.data.name;
     let o = &cmd.data.options();
+    let mut selector = Selector::read((guild, cmd.user.id))
+        .await
+        .unwrap_or_else(|_| Selector::new(cmd.user.id, guild));
 
-    if let Ok(options) = get_subcommand(c, o, CREATE) {
-        let role = get_role(c, options, ROLE)?;
-        let raw_icon = get_str(c, options, ICON)?;
+    if let Ok(o) = get_subcommand(o, SC_CREATE) {
+        let role = get_role(o, OP_ROLE)?;
+        let icon = get_str(o, OP_ICON).and_then(|s| {
+            ReactionType::try_from(s).map_err(|_| Error::InvalidId(Value::Role, s.to_string()))
+        })?;
 
-        let Ok(icon) = ReactionType::try_from(raw_icon) else {
-			return Err(Error::Other("Invalid icon"))
-		};
+        selector.roles.push(Toggle {
+            role: role.id,
+            icon,
+        });
+        selector.write().await?;
 
-        selector.toggles.push(Toggle::new(role.id, icon));
-        req.write(&selector).await?;
-
-        let embed = CreateEmbed::new()
-            .color(BOT_COLOR)
-            .title(format!("Created \"{}\" selector!", role.name));
+        let title = format!("Created \"{}\" selector!", role.name);
+        let embed = CreateEmbed::new().color(BOT_COLOR).title(title);
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
@@ -178,15 +166,14 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         cmd.create_response(ctx, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
-    } else if let Ok(options) = get_subcommand(c, o, REMOVE) {
-        let role = get_role(c, options, ROLE)?;
+    } else if let Ok(o) = get_subcommand(o, SC_REMOVE) {
+        let role = get_role(o, OP_ROLE)?;
 
-        selector.toggles.retain(|t| t.role_id != role.id);
-        req.write(&selector).await?;
+        selector.roles.retain(|t| t.role != role.id);
+        selector.write().await?;
 
-        let embed = CreateEmbed::new()
-            .color(BOT_COLOR)
-            .title(format!("Removed \"{}\" selector!", role.name));
+        let title = format!("Removed \"{}\" selector!", role.name);
+        let embed = CreateEmbed::new().color(BOT_COLOR).title(title);
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
@@ -194,34 +181,37 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         cmd.create_response(ctx, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
-    } else if get_subcommand(c, o, LIST).is_ok() {
-        let embed = CreateEmbed::new().color(BOT_COLOR).title("Role selectors");
+    } else if get_subcommand(o, SC_LIST).is_ok() {
+        let embed = CreateEmbed::new().color(BOT_COLOR).title("All selectors");
         let mut message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
 
-        for button in selector.to_buttons(ctx, true).await? {
+        for toggle in &selector.roles {
+            let button = toggle.to_button(ctx, (guild, true)).await?;
+
             message = message.button(button);
         }
 
         cmd.create_response(ctx, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
-    } else if let Ok(options) = get_subcommand(c, o, SEND) {
-        if selector.toggles.is_empty() {
-            return Err(Error::Other("No role selectors have been created"));
+    } else if let Ok(o) = get_subcommand(o, SC_SEND) {
+        if selector.roles.is_empty() {
+            return Err(Error::Other("No selectors have been created"));
         }
 
-        let title = get_str(c, options, TITLE)?;
+        let title = get_str(o, OP_TEXT)?;
         let embed = CreateEmbed::new().color(BOT_COLOR).title(title);
         let mut message = CreateMessage::new().embed(embed);
 
-        for button in selector.to_buttons(ctx, false).await? {
+        for toggle in &selector.roles {
+            let button = toggle.to_button(ctx, (guild, true)).await?;
+
             message = message.button(button);
         }
 
         cmd.channel_id.send_message(ctx, message).await?;
-        req.remove().await?;
 
         let embed = CreateEmbed::new().color(BOT_COLOR).title("Sent selectors!");
         let message = CreateInteractionResponseMessage::new()
@@ -232,28 +222,28 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .await
             .map_err(Error::from)
     } else {
-        Err(Error::InvalidCommand(cmd.data.name.clone()))
+        Err(Error::InvalidId(Value::Command, cmd.data.name.clone()))
     }
 }
 pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Result<()> {
-    let (name, _, rest) = parse_cid(&cpn.data.custom_id)?;
+    let custom_id = CustomId::try_from(cpn.data.custom_id.as_str())?;
 
-    if name != TOGGLE {
-        return Err(Error::InvalidComponent(cpn.data.custom_id.clone()));
+    if custom_id.name != CM_TOGGLE {
+        return Err(Error::InvalidId(Value::Component, custom_id.name));
     }
-    let Some(id) = rest.first().and_then(|s| s.parse().ok()) else {
-		return Err(Error::InvalidComponentData(cpn.data.custom_id.clone(), "role_id"))
+    let Some(id) = custom_id.args.first().and_then(|s| s.parse().ok()) else {
+		return Err(Error::MissingValue(Value::Data));
 	};
     let Some(member) = cpn.member.as_mut() else {
-		return Err(Error::MissingMember(cpn.user.id))
+		return Err(Error::MissingValue(Value::Member));
 	};
 
-    let role_id = RoleId::new(id);
+    let role = RoleId::new(id);
 
-    if member.roles.contains(&role_id) {
-        member.remove_role(ctx, role_id).await?;
+    if member.roles.contains(&role) {
+        member.remove_role(ctx, role).await?;
     } else {
-        member.add_role(ctx, role_id).await?;
+        member.add_role(ctx, role).await?;
     }
 
     cpn.create_response(ctx, CreateInteractionResponse::Acknowledge)

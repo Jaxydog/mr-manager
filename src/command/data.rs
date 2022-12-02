@@ -4,8 +4,8 @@ pub const NAME: &str = "data";
 
 pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
-        .description("Displays information about data usage and privacy")
         .default_member_permissions(Permissions::USE_APPLICATION_COMMANDS)
+        .description("Displays information about data usage and privacy")
         .dm_permission(true)
 }
 
@@ -17,15 +17,11 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .color(BOT_COLOR)
         .description(include_str!(r"..\include\data.txt"))
         .title("Data Usage and Privacy");
+    let message = CreateInteractionResponseMessage::new()
+        .embed(embed)
+        .ephemeral(true);
 
-    cmd.create_response(
-        ctx,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .embed(embed)
-                .ephemeral(true),
-        ),
-    )
-    .await
-    .map_err(Error::from)
+    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        .await
+        .map_err(Error::from)
 }

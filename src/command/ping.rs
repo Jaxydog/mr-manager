@@ -11,21 +11,21 @@ pub fn new() -> CreateCommand {
 
 pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
     let mut embed = CreateEmbed::new().color(BOT_COLOR).title("Calculating...");
-    let msg = CreateInteractionResponseMessage::new()
+    let message = CreateInteractionResponseMessage::new()
         .embed(embed.clone())
         .ephemeral(true);
 
-    cmd.create_response(ctx, CreateInteractionResponse::Message(msg))
+    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
         .await?;
 
-    let response = cmd.get_response(ctx).await?;
-    let sent = response.id.created_at().timestamp_millis();
+    let res = cmd.get_response(ctx).await?;
+    let sent = res.id.created_at().timestamp_millis();
     let received = cmd.id.created_at().timestamp_millis();
-    let delay = sent - received;
+    let ms = sent - received;
 
-    embed = embed.title(format!("Pong! ({delay}ms)"));
+    embed = embed.title(format!("Pong! ({ms}ms)"));
     cmd.edit_response(ctx, EditInteractionResponse::new().embed(embed))
-        .await
-        .map(|_| ())
-        .map_err(Error::from)
+        .await?;
+
+    Ok(())
 }
