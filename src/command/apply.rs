@@ -297,12 +297,12 @@ impl ToButtonArray for Form {
             CreateButton::new(accept.to_string())
                 .disabled(disabled)
                 .emoji('👍')
-                .label("Accept Application")
+                .label("Accept")
                 .style(ButtonStyle::Success),
             CreateButton::new(deny.to_string())
                 .disabled(disabled)
                 .emoji('👎')
-                .label("Deny Application")
+                .label("Deny")
                 .style(ButtonStyle::Danger),
             CreateButton::new(resend.to_string())
                 .disabled(disabled)
