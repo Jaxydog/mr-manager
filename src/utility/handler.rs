@@ -31,6 +31,7 @@ impl Handler {
             offer::new(),
             oracle::new(),
             ping::new(),
+            poll::new(),
             role::new(),
         ]
     }
@@ -117,12 +118,14 @@ impl EventHandler for Handler {
                 offer::NAME => offer::run_command(&ctx, i).await,
                 oracle::NAME => oracle::run_command(&ctx, i).await,
                 ping::NAME => ping::run_command(&ctx, i).await,
+                poll::NAME => poll::run_command(&ctx, i).await,
                 role::NAME => role::run_command(&ctx, i).await,
                 _ => Err(Error::InvalidValue(Value::Command, id)),
             },
             Interaction::Component(i) => match CustomId::try_from(i.data.custom_id.as_str()) {
                 Ok(c) => match c.base.as_str() {
                     apply::NAME => apply::run_component(&ctx, i).await,
+                    poll::NAME => poll::run_component(&ctx, i).await,
                     role::NAME => role::run_component(&ctx, i).await,
                     _ => Err(Error::InvalidValue(Value::Component, id)),
                 },
@@ -131,6 +134,7 @@ impl EventHandler for Handler {
             Interaction::Modal(i) => match CustomId::try_from(i.data.custom_id.as_str()) {
                 Ok(c) => match c.base.as_str() {
                     apply::NAME => apply::run_modal(&ctx, i).await,
+                    poll::NAME => poll::run_modal(&ctx, i).await,
                     _ => Err(Error::InvalidValue(Value::Modal, id)),
                 },
                 Err(e) => Err(e),
