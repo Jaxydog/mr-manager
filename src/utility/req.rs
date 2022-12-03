@@ -39,9 +39,6 @@ where
         self.dir().join(&self.key).with_extension(Self::EXT)
     }
 
-    pub async fn exists(&self) -> bool {
-        File::open(self.path()).await.is_ok()
-    }
     pub async fn read(&self) -> Result<T> {
         let file = File::open(self.path()).await?;
 
@@ -93,19 +90,6 @@ impl<T: AsReq> TryAsReq for T {
         Ok(self.as_req())
     }
 }
-
-#[async_trait]
-pub trait ExistsReq: TryNewReq {
-    async fn exists(args: Self::Args) -> bool {
-        if let Ok(req) = Self::try_new_req(args) {
-            req.exists().await
-        } else {
-            false
-        }
-    }
-}
-
-impl<T: TryNewReq> ExistsReq for T {}
 
 #[async_trait]
 pub trait ReadReq: TryNewReq {

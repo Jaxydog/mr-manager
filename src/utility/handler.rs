@@ -31,7 +31,8 @@ impl Handler {
             offer::new(),
             oracle::new(),
             ping::new(),
-            poll::new(),
+            // poll::new(),
+            quote::new(),
             role::new(),
         ]
     }
@@ -119,6 +120,7 @@ impl EventHandler for Handler {
                 oracle::NAME => oracle::run_command(&ctx, i).await,
                 ping::NAME => ping::run_command(&ctx, i).await,
                 poll::NAME => poll::run_command(&ctx, i).await,
+                quote::NAME => quote::run_command(&ctx, i).await,
                 role::NAME => role::run_command(&ctx, i).await,
                 _ => Err(Error::InvalidValue(Value::Command, id)),
             },
