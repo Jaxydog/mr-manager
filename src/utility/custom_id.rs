@@ -53,6 +53,12 @@ impl TryFrom<String> for CustomId {
     }
 }
 
+impl From<CustomId> for String {
+    fn from(value: CustomId) -> Self {
+        value.to_string()
+    }
+}
+
 impl Display for CustomId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let args = self.args.join(";");

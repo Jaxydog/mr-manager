@@ -1,349 +1,31 @@
-use rand::{thread_rng, Rng};
-
 use crate::prelude::*;
+
+pub use self::config::*;
+pub use self::form::*;
+
+pub mod config;
+pub mod form;
 
 pub const NAME: &str = "apply";
 
-pub const CM_MODAL: &str = formatcp!("{NAME}_modal");
-pub const CM_ABOUT: &str = formatcp!("{NAME}_about");
-pub const CM_ACCEPT: &str = formatcp!("{NAME}_accept");
-pub const CM_DENY: &str = formatcp!("{NAME}_deny");
-pub const CM_RESEND: &str = formatcp!("{NAME}_resend");
-
-pub const MD_SUBMIT: &str = formatcp!("{NAME}_submit");
-pub const MD_UPDATE: &str = formatcp!("{NAME}_update");
-
-pub const SC_SETUP: &str = "setup";
-pub const SC_EDIT: &str = "edit";
+pub const SC_CONFIG: &str = "config";
+pub const SC_MODIFY: &str = "modify";
 pub const SC_UPDATE: &str = "update";
 pub const SC_REMOVE: &str = "remove";
 
 pub const OP_TITLE: &str = "title";
-pub const OP_DESCRIPTION: &str = "content";
-pub const OP_THUMBNAIL: &str = "thumbnail_link";
+pub const OP_DESCRIPTION: &str = "description";
+pub const OP_THUMB_LINK: &str = "thumbnail_link";
 pub const OP_CHANNEL: &str = "output_channel";
+pub const OP_ROLE: &str = "acceptance_role";
 pub const OP_QUESTION_1: &str = "question_1";
 pub const OP_QUESTION_2: &str = "question_2";
 pub const OP_QUESTION_3: &str = "question_3";
 pub const OP_QUESTION_4: &str = "question_4";
 pub const OP_QUESTION_5: &str = "question_5";
-pub const OP_ROLE: &str = "accept_role";
 pub const OP_USER: &str = "user";
 pub const OP_STATUS: &str = "status";
-pub const OP_REASON: &str = "reason";
-
-pub const TOAST: [&str; 8] = [
-    "I spot a new member!",
-    "A wild user appeared!",
-    "Oh god, there's *another* one.",
-    "This one seems... *suspicious...*",
-    "Careful, they might bite!",
-    "I'd keep an eye on this one...",
-    "They didn't bring pizza.",
-    "Who let *this* guy in?",
-];
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Content {
-    pub title: String,
-    pub description: String,
-    pub thumbnail: String,
-    pub questions: Vec<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub channel: ChannelId,
-    pub role: RoleId,
-    pub content: Content,
-    anchor: Option<Anchor>,
-}
-
-impl Anchored for Config {
-    fn anchor(&self) -> Result<Anchor> {
-        self.anchor.ok_or(Error::MissingValue(Value::Anchor))
-    }
-}
-
-impl NewReq for Config {
-    type Args = GuildId;
-
-    fn new_req(guild: Self::Args) -> Req<Self> {
-        Req::new(format!("{NAME}/{guild}"), ".cfg")
-    }
-}
-
-impl TryAsReq for Config {
-    fn try_as_req(&self) -> Result<Req<Self>> {
-        Ok(Self::new_req(self.anchor()?.guild))
-    }
-}
-
-#[async_trait]
-impl ToEmbedAsync for Config {
-    type Args = GuildId;
-
-    async fn to_embed(&self, ctx: &Context, guild: Self::Args) -> Result<CreateEmbed> {
-        let guild = guild.to_partial_guild(ctx).await?;
-        let description = self.content.description.replace(['\r', '\n'], "\n");
-        let footer = CreateEmbedFooter::new(format!("Questions: {}", self.content.questions.len()));
-        let mut author = CreateEmbedAuthor::new(&guild.name);
-
-        if let Some(icon_url) = guild.icon_url() {
-            author = author.icon_url(icon_url);
-        }
-
-        Ok(CreateEmbed::new()
-            .author(author)
-            .color(BOT_COLOR)
-            .description(description.trim())
-            .footer(footer)
-            .thumbnail(self.content.thumbnail.as_str())
-            .title(self.content.title.trim()))
-    }
-}
-
-impl ToButtonArray for Config {
-    type Args = bool;
-
-    fn to_button_array(&self, disabled: Self::Args) -> Result<Vec<CreateButton>> {
-        Ok(vec![
-            CreateButton::new(CM_MODAL)
-                .disabled(disabled)
-                .emoji('👋')
-                .label("Apply to Guild")
-                .style(ButtonStyle::Primary),
-            CreateButton::new(CM_ABOUT)
-                .disabled(disabled)
-                .emoji('ℹ')
-                .label("About Applications")
-                .style(ButtonStyle::Secondary),
-        ])
-    }
-}
-
-impl ToModal for Config {
-    type Args = ();
-
-    fn to_modal(&self, _: Self::Args) -> Result<CreateModal> {
-        let modal = CreateModal::new(MD_SUBMIT, "Apply to Guild");
-        let mut components = vec![];
-
-        for (index, question) in self.content.questions.iter().enumerate() {
-            let custom_id = index.to_string();
-            let input = CreateInputText::new(InputTextStyle::Paragraph, question, custom_id);
-
-            components.push(CreateActionRow::InputText(
-                input.max_length(1024).required(true),
-            ));
-        }
-
-        Ok(modal.components(components))
-    }
-}
-
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Status {
-    Pending,
-    Accepted,
-    Denied,
-    Resend,
-}
-
-impl From<Status> for i32 {
-    fn from(s: Status) -> Self {
-        s as i32
-    }
-}
-
-impl TryFrom<i32> for Status {
-    type Error = Error;
-
-    fn try_from(value: i32) -> Result<Self> {
-        match value {
-            0 => Ok(Self::Pending),
-            1 => Ok(Self::Accepted),
-            2 => Ok(Self::Denied),
-            3 => Ok(Self::Resend),
-            _ => Err(Error::InvalidValue(Value::Data, value.to_string())),
-        }
-    }
-}
-
-impl Display for Status {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let icon = match self {
-            Self::Pending => '🤔',
-            Self::Accepted => '👍',
-            Self::Denied => '👎',
-            Self::Resend => '🤷',
-        };
-
-        write!(f, "{icon} {self:?}")
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Form {
-    pub user: UserId,
-    pub status: Status,
-    pub reason: Option<String>,
-    pub answers: Vec<(usize, String)>,
-    anchor: Option<Anchor>,
-}
-
-impl Form {
-    pub async fn update(
-        &mut self,
-        ctx: &Context,
-        guild: GuildId,
-        status: Status,
-        reason: Option<impl Send + Sync + Into<String>>,
-    ) -> Result<()> {
-        let config = Config::read(guild).await?;
-        let mut member = guild.member(ctx, self.user).await?;
-
-        self.status = status;
-        self.reason = reason.map(Into::into);
-        self.write().await?;
-
-        if status == Status::Accepted {
-            member.add_role(ctx, config.role).await?;
-        } else {
-            member.remove_role(ctx, config.role).await?;
-        }
-
-        if let Some(anchor) = self.anchor {
-            let mut message = anchor.to_message(ctx).await?;
-            let mut edit = EditMessage::new().embed(self.to_embed(ctx, anchor.guild).await?);
-
-            for button in self.to_button_array(status != Status::Pending)? {
-                edit = edit.button(button);
-            }
-
-            message.edit(ctx, edit).await?;
-        }
-
-        Ok(())
-    }
-}
-
-impl Anchored for Form {
-    fn anchor(&self) -> Result<Anchor> {
-        self.anchor.ok_or(Error::MissingValue(Value::Anchor))
-    }
-}
-
-impl NewReq for Form {
-    type Args = (GuildId, UserId);
-
-    fn new_req((guild, user): Self::Args) -> Req<Self> {
-        Req::new(format!("{NAME}/{guild}"), user.to_string())
-    }
-}
-
-impl TryAsReq for Form {
-    fn try_as_req(&self) -> Result<Req<Self>> {
-        Ok(Self::new_req((self.anchor()?.guild, self.user)))
-    }
-}
-
-#[async_trait]
-impl ToEmbedAsync for Form {
-    type Args = GuildId;
-
-    async fn to_embed(&self, ctx: &Context, guild: Self::Args) -> Result<CreateEmbed> {
-        let config = Config::read(guild).await?;
-        let user = ctx.http.get_user(self.user).await?;
-
-        let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
-        let color = user.accent_colour.unwrap_or(BOT_COLOR);
-        let title = TOAST[thread_rng().gen_range(0..TOAST.len())];
-        let mut description = String::new();
-
-        description.push_str(&format!("**Profile:** <@{}>\n", self.user));
-
-        let time = TimeString::new(self.anchor.map_or_else(
-            || Utc::now().timestamp_millis(),
-            |anchor| anchor.message.created_at().timestamp_millis(),
-        ))
-        .flag(TimeFlag::Relative);
-
-        description.push_str(&format!("**Received:** {time}\n"));
-        description.push_str(&format!("**Status:** {}\n", self.status));
-
-        if let Some(reason) = self.reason.as_ref() {
-            description.push_str(&format!("**Reason:** {reason}"));
-        }
-
-        let mut embed = CreateEmbed::new()
-            .author(author)
-            .color(color)
-            .description(description)
-            .thumbnail(user.face())
-            .title(title);
-
-        for (index, question) in config.content.questions.iter().enumerate() {
-            let answer = self
-                .answers
-                .iter()
-                .find_map(|(n, s)| (*n == index).then_some(format!("> {s}")))
-                .unwrap_or_else(|| "N/A".to_string());
-
-            embed = embed.field(question, answer, false);
-        }
-
-        Ok(embed)
-    }
-}
-
-impl ToButtonArray for Form {
-    type Args = bool;
-
-    fn to_button_array(&self, disabled: Self::Args) -> Result<Vec<CreateButton>> {
-        let accept = CustomId::new(CM_ACCEPT).arg(self.user.to_string());
-        let deny = CustomId::new(CM_DENY).arg(self.user.to_string());
-        let resend = CustomId::new(CM_RESEND).arg(self.user.to_string());
-
-        Ok(vec![
-            CreateButton::new(accept.to_string())
-                .disabled(disabled)
-                .emoji('👍')
-                .label("Accept")
-                .style(ButtonStyle::Success),
-            CreateButton::new(deny.to_string())
-                .disabled(disabled)
-                .emoji('👎')
-                .label("Deny")
-                .style(ButtonStyle::Danger),
-            CreateButton::new(resend.to_string())
-                .disabled(disabled)
-                .emoji('🤷')
-                .label("Request Resend")
-                .style(ButtonStyle::Secondary),
-        ])
-    }
-}
-
-impl ToModal for Form {
-    type Args = Status;
-
-    fn to_modal(&self, status: Self::Args) -> Result<CreateModal> {
-        let custom_id = CustomId::new(MD_UPDATE)
-            .arg(self.user.to_string())
-            .arg(i32::from(status).to_string());
-
-        let modal = CreateModal::new(custom_id.to_string(), "Update Application");
-        let components = vec![CreateActionRow::InputText(
-            CreateInputText::new(InputTextStyle::Short, "Reason (Optional)", OP_REASON)
-                .max_length(256)
-                .required(false),
-        )];
-
-        Ok(modal.components(components))
-    }
-}
+pub const OP_OVERWRITE: &str = "overwrite";
 
 #[allow(clippy::too_many_lines)]
 pub fn new() -> CreateCommand {
@@ -354,14 +36,14 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
-                SC_SETUP,
-                "Set up guild applications",
+                SC_CONFIG,
+                "Configure guild applications",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_TITLE,
-                    "The title of the entry embed",
+                    "The title of the guild application embed",
                 )
                 .max_length(256)
                 .clone()
@@ -371,7 +53,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_DESCRIPTION,
-                    "The description of the entry embed",
+                    "The description of the guild application embed",
                 )
                 .max_length(4096)
                 .clone()
@@ -380,8 +62,8 @@ pub fn new() -> CreateCommand {
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::String,
-                    OP_THUMBNAIL,
-                    "The thumbnail of the entry embed",
+                    OP_THUMB_LINK,
+                    "The thumbnail link of the guild application embed",
                 )
                 .required(true),
             )
@@ -389,7 +71,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::Channel,
                     OP_CHANNEL,
-                    "The channel that completed forms are sent to",
+                    "The output channel for submitted forms",
                 )
                 .channel_types(vec![ChannelType::Text])
                 .required(true),
@@ -398,7 +80,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::Role,
                     OP_ROLE,
-                    "The role that is given to accepted members",
+                    "The role given to members that are accepted",
                 )
                 .required(true),
             )
@@ -406,7 +88,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_1,
-                    "The first question of the application",
+                    "The first question on the application",
                 )
                 .max_length(45)
                 .clone()
@@ -416,7 +98,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_2,
-                    "The second question of the application",
+                    "The second question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -425,7 +107,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_3,
-                    "The third question of the application",
+                    "The third question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -434,7 +116,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_4,
-                    "The fourth question of the application",
+                    "The fourth question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -443,7 +125,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_5,
-                    "The fifth question of the application",
+                    "The fifth question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -452,14 +134,14 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
-                SC_EDIT,
-                "Edit the guild application configuration",
+                SC_MODIFY,
+                "Modify the guild application configuration",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_TITLE,
-                    "The title of the entry embed",
+                    "The title of the guild application embed",
                 )
                 .max_length(256)
                 .clone(),
@@ -468,34 +150,34 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_DESCRIPTION,
-                    "The description of the entry embed",
+                    "The description of the guild application embed",
                 )
                 .max_length(4096)
                 .clone(),
             )
             .add_sub_option(CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_THUMBNAIL,
-                "The thumbnail of the entry embed",
+                OP_THUMB_LINK,
+                "The thumbnail link of the guild application embed",
             ))
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::Channel,
                     OP_CHANNEL,
-                    "The channel that completed forms are sent to",
+                    "The output channel for submitted forms",
                 )
                 .channel_types(vec![ChannelType::Text]),
             )
             .add_sub_option(CreateCommandOption::new(
                 CommandOptionType::Role,
                 OP_ROLE,
-                "The role that is given to accepted members",
+                "The role given to members that are accepted",
             ))
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_1,
-                    "The first question of the application",
+                    "The first question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -504,7 +186,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_2,
-                    "The second question of the application",
+                    "The second question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -513,7 +195,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_3,
-                    "The third question of the application",
+                    "The third question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -522,7 +204,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_4,
-                    "The fourth question of the application",
+                    "The fourth question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -531,7 +213,7 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_QUESTION_5,
-                    "The fifth question of the application",
+                    "The fifth question on the application",
                 )
                 .max_length(45)
                 .clone(),
@@ -541,13 +223,13 @@ pub fn new() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
                 SC_UPDATE,
-                "Update a guild application",
+                "Update a member's submitted application",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::User,
                     OP_USER,
-                    "The user who submitted the application",
+                    "The guild member that submitted the application",
                 )
                 .required(true),
             )
@@ -555,34 +237,39 @@ pub fn new() -> CreateCommand {
                 CreateCommandOption::new(
                     CommandOptionType::Integer,
                     OP_STATUS,
-                    "The target status of the application",
+                    "The new status of the application",
                 )
-                .add_int_choice(Status::Accepted.to_string(), i32::from(Status::Accepted))
-                .add_int_choice(Status::Denied.to_string(), i32::from(Status::Denied))
-                .add_int_choice(Status::Resend.to_string(), i32::from(Status::Resend))
+                .add_int_choice(Status::Accepted.to_string(), Status::Accepted as i32)
+                .add_int_choice(Status::Denied.to_string(), Status::Denied as i32)
+                .add_int_choice(Status::Resend.to_string(), Status::Resend as i32)
                 .required(true),
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::String,
                     OP_REASON,
-                    "The provided reason",
+                    "The reason for the update",
                 )
                 .max_length(256)
                 .clone(),
-            ),
+            )
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                OP_OVERWRITE,
+                "Whether to overwrite a finalized application (default false)",
+            )),
         )
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
                 SC_REMOVE,
-                "Remove a guild application",
+                "Remove a member's submitted application",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::User,
                     OP_USER,
-                    "The user who submitted the application",
+                    "The guild member that submitted the application",
                 )
                 .required(true),
             ),
@@ -591,51 +278,35 @@ pub fn new() -> CreateCommand {
 
 #[allow(clippy::too_many_lines)]
 pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let Some(guild) = cmd.guild_id else {
-        return Err(Error::MissingId(Value::Guild));
-    };
-
+    let guild = cmd.guild_id.ok_or(Error::MissingId(Value::Guild))?;
     let o = &cmd.data.options();
 
-    if let Ok(o) = get_subcommand(o, SC_SETUP) {
-        let mut config = Config {
-            channel: get_channel(o, OP_CHANNEL)?.id,
-            role: get_role(o, OP_ROLE)?.id,
-            content: Content {
-                title: get_str(o, OP_TITLE)?.to_string(),
-                description: get_str(o, OP_DESCRIPTION)?
-                    .replace(r"\n", "\n")
-                    .trim()
-                    .to_string(),
-                thumbnail: get_str(o, OP_THUMBNAIL)?.to_string(),
-                questions: [
-                    get_str(o, OP_QUESTION_1),
-                    get_str(o, OP_QUESTION_2),
-                    get_str(o, OP_QUESTION_3),
-                    get_str(o, OP_QUESTION_4),
-                    get_str(o, OP_QUESTION_5),
-                ]
-                .into_iter()
-                .filter_map(Result::ok)
-                .map(ToString::to_string)
-                .collect(),
-            },
-            anchor: None,
-        };
+    if let Ok(o) = get_subcommand(o, SC_CONFIG) {
+        let title = get_str(o, OP_TITLE)?;
+        let description = get_str(o, OP_DESCRIPTION)?.replace(r"\n", "\n");
+        let thumbnail = get_str(o, OP_THUMB_LINK)?;
+        let questions = [
+            get_str(o, OP_QUESTION_1),
+            get_str(o, OP_QUESTION_2),
+            get_str(o, OP_QUESTION_3),
+            get_str(o, OP_QUESTION_4),
+            get_str(o, OP_QUESTION_5),
+        ]
+        .into_iter()
+        .filter_map(Result::ok)
+        .collect();
 
-        let mut message = CreateMessage::new().embed(config.to_embed(ctx, guild).await?);
+        let mut config = Config::new(
+            get_channel(o, OP_CHANNEL)?.id,
+            get_role(o, OP_ROLE)?.id,
+            Content::new(title, description, thumbnail, questions),
+        );
 
-        for button in config.to_button_array(false)? {
-            message = message.button(button);
-        }
-
-        let message = cmd.channel_id.send_message(ctx, message).await?;
-        config.anchor = Some(Anchor::try_from(message)?);
-        config.write().await?;
+        config.send(ctx, guild, cmd.channel_id).await?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
-            .title("Set up applications!");
+            .title("Configured applications!");
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
@@ -643,7 +314,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         cmd.create_response(ctx, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
-    } else if let Ok(o) = get_subcommand(o, SC_EDIT) {
+    } else if let Ok(o) = get_subcommand(o, SC_MODIFY) {
         let mut config = Config::read(guild).await?;
         let mut update = false;
 
@@ -652,18 +323,12 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             update = true;
         }
         if let Ok(description) = get_str(o, OP_DESCRIPTION) {
-            config.content.description = description.replace(r"\n", "\n").trim().to_string();
+            config.content.description = description.to_string();
             update = true;
         }
-        if let Ok(thumbnail) = get_str(o, OP_THUMBNAIL) {
+        if let Ok(thumbnail) = get_str(o, OP_THUMB_LINK) {
             config.content.thumbnail = thumbnail.to_string();
             update = true;
-        }
-        if let Ok(channel) = get_channel(o, OP_CHANNEL) {
-            config.channel = channel.id;
-        }
-        if let Ok(role) = get_role(o, OP_ROLE) {
-            config.role = role.id;
         }
         if let Ok(question) = get_str(o, OP_QUESTION_1) {
             config.content.questions[0] = question.to_string();
@@ -686,18 +351,22 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             update = true;
         }
 
-        config.write().await?;
+        if let Ok(channel) = get_channel(o, OP_CHANNEL) {
+            config.channel = channel.id;
+        }
+        if let Ok(role) = get_role(o, OP_ROLE) {
+            config.role = role.id;
+        }
 
         if update {
-            let mut message = config.anchor()?.to_message(ctx).await?;
-            let edit = EditMessage::new().embed(config.to_embed(ctx, guild).await?);
-
-            message.edit(ctx, edit).await?;
+            config.send(ctx, guild, cmd.channel_id).await?;
+        } else {
+            config.write().await?;
         }
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
-            .title("Edited configuration!");
+            .title("Updated application configuration!");
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
@@ -707,20 +376,25 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_UPDATE) {
         let (user, _) = get_user(o, OP_USER)?;
+        let status = Status::try_from(get_i64(o, OP_STATUS)?)?;
+        let reason = get_str(o, OP_REASON).ok();
+        let overwrite = get_bool(o, OP_OVERWRITE).unwrap_or(false);
+
+        let config = Config::read(guild).await?;
         let mut form = Form::read((guild, user.id)).await?;
 
-        let status = get_i64(o, OP_STATUS)?;
-        let Ok(status) = i32::try_from(status) else {
-            return Err(Error::InvalidValue(Value::Other("Status"), status.to_string()))
-        };
-        let status = Status::try_from(status)?;
+        if form.status == status {
+            return Err(Error::Other("The application already has this status"));
+        }
+        if !overwrite && form.status != Status::Pending {
+            return Err(Error::Other("The user's application is already finalized"));
+        }
 
-        form.update(ctx, guild, status, get_str(o, OP_REASON).ok())
-            .await?;
+        form.update(ctx, guild, config.role, status, reason).await?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
-            .title("Updated application!");
+            .title("Updated user application!");
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
@@ -729,24 +403,24 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .await
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_REMOVE) {
-        let config = Config::read(guild).await?;
         let (user, _) = get_user(o, OP_USER)?;
+        let config = Config::read(guild).await?;
 
         let form = Form::read((guild, user.id)).await?;
         let mut member = guild.member(ctx, user.id).await?;
 
-        if let Some(anchor) = form.anchor.as_ref() {
-            let message = anchor.to_message(ctx).await?;
-
-            message.delete(ctx).await?;
+        if let Ok(anchor) = form.anchor() {
+            anchor.to_message(ctx).await?.delete(ctx).await?;
+        }
+        if member.roles.contains(&config.role) {
+            member.remove_role(ctx, config.role).await?;
         }
 
         form.remove().await?;
-        member.remove_role(ctx, config.role).await?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
-            .title("Removed application!");
+            .title("Removed user application!");
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
@@ -760,23 +434,15 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
 }
 pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Result<()> {
     let custom_id = CustomId::try_from(cpn.data.custom_id.as_str())?;
-    let Some(guild) = cpn.guild_id else {
-        return Err(Error::MissingId(Value::Guild));
-    };
+    let guild = cpn.guild_id.ok_or(Error::MissingId(Value::Guild))?;
 
     match custom_id.name.as_str() {
         CM_MODAL => {
             if let Ok(form) = Form::read((guild, cpn.user.id)).await {
                 match form.status {
-                    Status::Pending => {
-                        return Err(Error::Other("Your application is currently pending"))
-                    }
-                    Status::Accepted => {
-                        return Err(Error::Other("Your application has already been accepted"))
-                    }
-                    Status::Denied => {
-                        return Err(Error::Other("Your application has already been denied"))
-                    }
+                    Status::Pending => return Err(Error::Other("Your application is pending")),
+                    Status::Accepted => return Err(Error::Other("Your application was accepted")),
+                    Status::Denied => return Err(Error::Other("Your application was denied")),
                     Status::Resend => {}
                 }
             }
@@ -791,10 +457,11 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
             let user = ctx.http.get_current_user().await?;
             let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
             let embed = CreateEmbed::new()
-                .color(BOT_COLOR)
                 .author(author)
+                .color(BOT_COLOR)
                 .description(include_str!(r"..\include\apply\about.txt"))
                 .title("About Guild Applications");
+
             let message = CreateInteractionResponseMessage::new()
                 .embed(embed)
                 .ephemeral(true);
@@ -816,7 +483,7 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
                 CM_ACCEPT => Status::Accepted,
                 CM_DENY => Status::Denied,
                 CM_RESEND => Status::Resend,
-                n => return Err(Error::InvalidId(Value::Component, n.to_string())),
+                _ => return Err(Error::InvalidId(Value::Component, custom_id.name)),
             };
 
             let modal = Form::read((guild, user)).await?.to_modal(status)?;
@@ -830,36 +497,20 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
 }
 pub async fn run_modal(ctx: &Context, mdl: &ModalInteraction) -> Result<()> {
     let custom_id = CustomId::try_from(mdl.data.custom_id.as_str())?;
-    let Some(guild) = mdl.guild_id else {
-        return Err(Error::MissingId(Value::Guild));
-    };
-
+    let guild = mdl.guild_id.ok_or(Error::MissingId(Value::Guild))?;
     let o = &mdl.data.components;
+
+    let config = Config::read(guild).await?;
 
     match custom_id.name.as_str() {
         MD_SUBMIT => {
-            let mut form = Form {
-                user: mdl.user.id,
-                status: Status::Pending,
-                reason: None,
-                answers: (0..5)
-                    .into_iter()
-                    .filter_map(|n| get_input_text(o, &n.to_string()).ok().map(|s| (n, s)))
-                    .collect(),
-                anchor: None,
-            };
+            let answers = (0..5_u8)
+                .filter_map(|n| get_input_text(o, &n.to_string()).ok())
+                .collect();
 
-            let mut message = CreateMessage::new().embed(form.to_embed(ctx, guild).await?);
+            let mut form = Form::new(mdl.user.id, answers);
 
-            for button in form.to_button_array(false)? {
-                message = message.button(button);
-            }
-
-            let config = Config::read(guild).await?;
-            let message = config.channel.send_message(ctx, message).await?;
-
-            form.anchor = Some(Anchor::try_from(message)?);
-            form.write().await?;
+            form.send(ctx, guild, config.channel).await?;
 
             mdl.create_response(ctx, CreateInteractionResponse::Acknowledge)
                 .await
@@ -868,8 +519,8 @@ pub async fn run_modal(ctx: &Context, mdl: &ModalInteraction) -> Result<()> {
         MD_UPDATE => {
             let mut args = custom_id.args.iter();
 
-            let Some(user) = args.next()else {
-                return Err(Error::MissingId(Value::User));
+            let Some(user) = args.next() else {
+                return Err(Error::MissingId(Value::User))
             };
             let Ok(user) = user.parse() else {
                 return Err(Error::InvalidId(Value::User, user.to_string()));
@@ -879,15 +530,16 @@ pub async fn run_modal(ctx: &Context, mdl: &ModalInteraction) -> Result<()> {
             let Some(status) = args.next() else {
                 return Err(Error::MissingValue(Value::Other("Status")));
             };
-            let Ok(status) = status.parse::<i32>() else {
-                return Err(Error::InvalidValue(Value::Other("Status"), status.to_string()));
+            let Ok(status) = status.parse::<i64>() else {
+                return Err(Error::InvalidValue(Value::Other("Status"), status.to_string()))
             };
             let status = Status::try_from(status)?;
 
             let reason = get_input_text(o, OP_REASON).ok();
             let mut form = Form::read((guild, user)).await?;
 
-            form.update(ctx, guild, status, reason).await?;
+            form.update(ctx, guild, config.role, status, reason).await?;
+
             mdl.create_response(ctx, CreateInteractionResponse::Acknowledge)
                 .await
                 .map_err(Error::from)
