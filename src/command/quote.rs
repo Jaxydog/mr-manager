@@ -27,6 +27,14 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
 
     let user = get_user(o, OP_USER)?;
     let user = ctx.http.get_user(user.0.id).await?;
+
+    if user == cmd.user {
+        return Err(Error::Other("You cannot quote yourself"));
+    }
+    if user.bot {
+        return Err(Error::Other("You cannot quote a bot"));
+    }
+
     let text = get_str(o, OP_TEXT)?;
 
     let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
