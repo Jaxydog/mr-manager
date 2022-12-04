@@ -3,6 +3,7 @@
 #![warn(clippy::todo, clippy::unimplemented, clippy::unreachable)]
 #![allow(clippy::module_name_repetitions, clippy::unused_async)]
 #![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#![allow(clippy::wildcard_imports)]
 
 use crate::prelude::*;
 
