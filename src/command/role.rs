@@ -20,13 +20,14 @@ pub struct Toggle {
 }
 
 #[async_trait]
-impl ToButtonAsync for Toggle {
-    type Args = (GuildId, bool);
+impl TryAsButtonAsync for Toggle {
+    type Args<'a> = GuildId;
 
-    async fn to_button(
+    async fn try_as_button(
         &self,
         ctx: &Context,
-        (guild, disabled): Self::Args,
+        disabled: bool,
+        guild: Self::Args<'_>,
     ) -> Result<CreateButton> {
         let mut roles = guild.roles(ctx).await?;
         let Some(role) = roles.remove(&self.role) else {
@@ -188,7 +189,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .ephemeral(true);
 
         for toggle in &selector.roles {
-            let button = toggle.to_button(ctx, (guild, true)).await?;
+            let button = toggle.try_as_button(ctx, true, guild).await?;
 
             message = message.button(button);
         }
@@ -206,7 +207,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         let mut message = CreateMessage::new().embed(embed);
 
         for toggle in &selector.roles {
-            let button = toggle.to_button(ctx, (guild, true)).await?;
+            let button = toggle.try_as_button(ctx, false, guild).await?;
 
             message = message.button(button);
         }

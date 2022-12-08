@@ -47,10 +47,10 @@ impl Config {
         }
     }
     pub async fn send(&mut self, ctx: &Context, guild: GuildId, channel: ChannelId) -> Result<()> {
-        let embed = self.to_embed(ctx, guild).await?;
+        let embed = self.try_as_embed(ctx, guild).await?;
         let mut builder = CreateMessage::new().embed(embed);
 
-        for button in self.to_button_array(false)? {
+        for button in self.as_buttons(false, ()) {
             builder = builder.button(button);
         }
 
@@ -87,10 +87,10 @@ impl TryAsReq for Config {
 }
 
 #[async_trait]
-impl ToEmbedAsync for Config {
-    type Args = GuildId;
+impl TryAsEmbedAsync for Config {
+    type Args<'a> = GuildId;
 
-    async fn to_embed(&self, ctx: &Context, guild: Self::Args) -> Result<CreateEmbed> {
+    async fn try_as_embed(&self, ctx: &Context, guild: Self::Args<'_>) -> Result<CreateEmbed> {
         let guild = ctx.http.get_guild(guild).await?;
         let footer = CreateEmbedFooter::new(format!("Questions: {}", self.content.questions.len()));
         let mut author = CreateEmbedAuthor::new(&guild.name);
@@ -109,10 +109,10 @@ impl ToEmbedAsync for Config {
     }
 }
 
-impl ToButtonArray for Config {
-    type Args = bool;
+impl AsButtonVec for Config {
+    type Args<'a> = ();
 
-    fn to_button_array(&self, disabled: Self::Args) -> Result<Vec<CreateButton>> {
+    fn as_buttons(&self, disabled: bool, _: Self::Args<'_>) -> Vec<CreateButton> {
         let modal = CreateButton::new(CM_MODAL)
             .disabled(disabled)
             .emoji('👋')
@@ -124,14 +124,14 @@ impl ToButtonArray for Config {
             .label("About Applications")
             .style(ButtonStyle::Secondary);
 
-        Ok(vec![modal, about])
+        vec![modal, about]
     }
 }
 
-impl ToModal for Config {
-    type Args = ();
+impl AsModal for Config {
+    type Args<'a> = ();
 
-    fn to_modal(&self, _: Self::Args) -> Result<CreateModal> {
+    fn as_modal(&self, _: Self::Args<'_>) -> CreateModal {
         let modal = CreateModal::new(MD_SUBMIT, "Apply to Guild");
         let mut components = vec![];
 
@@ -143,6 +143,6 @@ impl ToModal for Config {
             components.push(row);
         }
 
-        Ok(modal.components(components))
+        modal.components(components)
     }
 }

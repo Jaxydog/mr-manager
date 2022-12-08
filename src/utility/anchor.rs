@@ -8,7 +8,7 @@ pub struct Anchor {
 }
 
 impl Anchor {
-    const __URL: &str = "https://discord.com/channels/";
+    const __URL: &str = "https://discord.com/channels";
 
     pub async fn to_guild(self, ctx: &Context) -> Result<PartialGuild> {
         Ok(self.guild.to_partial_guild(ctx).await?)

@@ -85,9 +85,9 @@ impl Form {
         TimeString::new(ms).flag(TimeFlag::Relative)
     }
     pub async fn send(&mut self, ctx: &Context, guild: GuildId, channel: ChannelId) -> Result<()> {
-        let mut builder = CreateMessage::new().embed(self.to_embed(ctx, guild).await?);
+        let mut builder = CreateMessage::new().embed(self.try_as_embed(ctx, guild).await?);
 
-        for button in self.to_button_array(self.status != Status::Pending)? {
+        for button in self.as_buttons(self.status != Status::Pending, ()) {
             builder = builder.button(button);
         }
 
@@ -161,9 +161,9 @@ impl Form {
 
         if let Some(anchor) = self.anchor {
             let mut message = anchor.to_message(ctx).await?;
-            let mut builder = EditMessage::new().embed(self.to_embed(ctx, guild).await?);
+            let mut builder = EditMessage::new().embed(self.try_as_embed(ctx, guild).await?);
 
-            for button in self.to_button_array(status != Status::Pending)? {
+            for button in self.as_buttons(status != Status::Pending, ()) {
                 builder = builder.button(button);
             }
 
@@ -195,10 +195,10 @@ impl TryAsReq for Form {
 }
 
 #[async_trait]
-impl ToEmbedAsync for Form {
-    type Args = GuildId;
+impl TryAsEmbedAsync for Form {
+    type Args<'a> = GuildId;
 
-    async fn to_embed(&self, ctx: &Context, guild: Self::Args) -> Result<CreateEmbed> {
+    async fn try_as_embed(&self, ctx: &Context, guild: Self::Args<'_>) -> Result<CreateEmbed> {
         let config = Config::read(guild).await?;
         let user = ctx.http.get_user(self.user).await?;
 
@@ -234,10 +234,10 @@ impl ToEmbedAsync for Form {
     }
 }
 
-impl ToButtonArray for Form {
-    type Args = bool;
+impl AsButtonVec for Form {
+    type Args<'a> = ();
 
-    fn to_button_array(&self, disabled: Self::Args) -> Result<Vec<CreateButton>> {
+    fn as_buttons(&self, disabled: bool, _: Self::Args<'_>) -> Vec<CreateButton> {
         let accept = CreateButton::new(CustomId::new(CM_ACCEPT).arg(self.user.to_string()))
             .disabled(disabled)
             .emoji('👍')
@@ -254,14 +254,14 @@ impl ToButtonArray for Form {
             .label("Resend")
             .style(ButtonStyle::Secondary);
 
-        Ok(vec![accept, deny, resend])
+        vec![accept, deny, resend]
     }
 }
 
-impl ToModal for Form {
-    type Args = Status;
+impl AsModal for Form {
+    type Args<'a> = Status;
 
-    fn to_modal(&self, status: Self::Args) -> Result<CreateModal> {
+    fn as_modal(&self, status: Self::Args<'_>) -> CreateModal {
         let custom_id = CustomId::new(MD_UPDATE)
             .arg(self.user.to_string())
             .arg((status as u8).to_string());
@@ -273,6 +273,6 @@ impl ToModal for Form {
                 .required(false),
         )];
 
-        Ok(modal.components(components))
+        modal.components(components)
     }
 }

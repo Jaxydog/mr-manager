@@ -31,7 +31,7 @@ impl Handler {
             offer::new(),
             oracle::new(),
             ping::new(),
-            // poll::new(),
+            poll::new(),
             quote::new(),
             role::new(),
         ]

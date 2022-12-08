@@ -58,17 +58,17 @@ impl Reply {
     }
 }
 
-impl ToEmbed for Reply {
-    type Args = (String, String);
+impl AsEmbed for Reply {
+    type Args<'a> = (&'a str, &'a str);
 
-    fn to_embed(&self, (name, question): Self::Args) -> Result<CreateEmbed> {
+    fn as_embed(&self, (name, question): Self::Args<'_>) -> CreateEmbed {
         let author = CreateEmbedAuthor::new("The Oracle").icon_url("https://cdn.discordapp.com/attachments/730389830877577267/1044068278479355954/image.png");
         let description = format!("**{name} asked...**\n> {question}\n\n*{}*", self.text);
 
-        Ok(CreateEmbed::new()
+        CreateEmbed::new()
             .author(author)
             .color(self.mood.color())
-            .description(description))
+            .description(description)
     }
 }
 
@@ -96,7 +96,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
 
     let index = thread_rng().gen_range(0..ANSWERS.len());
     let reply = ANSWERS[index];
-    let embed = reply.to_embed((name, query.to_string()))?;
+    let embed = reply.as_embed((&name, query));
 
     let message = CreateInteractionResponseMessage::new().embed(embed);
     cmd.create_response(ctx, CreateInteractionResponse::Message(message))

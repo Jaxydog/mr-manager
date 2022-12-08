@@ -64,7 +64,7 @@ impl std::fmt::Display for Log<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Logger {
     path: PathBuf,
     store: bool,

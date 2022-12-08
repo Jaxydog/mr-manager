@@ -447,7 +447,7 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
                 }
             }
 
-            let modal = Config::read(guild).await?.to_modal(())?;
+            let modal = Config::read(guild).await?.as_modal(());
 
             cpn.create_response(ctx, CreateInteractionResponse::Modal(modal))
                 .await
@@ -486,7 +486,7 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
                 _ => return Err(Error::InvalidId(Value::Component, custom_id.name)),
             };
 
-            let modal = Form::read((guild, user)).await?.to_modal(status)?;
+            let modal = Form::read((guild, user)).await?.as_modal(status);
 
             cpn.create_response(ctx, CreateInteractionResponse::Modal(modal))
                 .await

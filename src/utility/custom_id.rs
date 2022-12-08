@@ -10,15 +10,17 @@ pub struct CustomId {
 }
 
 impl CustomId {
-    pub fn new(name: impl Into<String>) -> Self {
-        let name: String = name.into();
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(name: impl ToString) -> Self {
+        let name: String = name.to_string();
         let base = name.split('_').next().unwrap_or(&name).to_string();
         let args = vec![];
 
         Self { base, name, args }
     }
-    pub fn arg(mut self, arg: impl Into<String>) -> Self {
-        self.args.push(arg.into());
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn arg(mut self, arg: impl ToString) -> Self {
+        self.args.push(arg.to_string());
         self
     }
 }
