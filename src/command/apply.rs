@@ -277,7 +277,7 @@ pub fn new() -> CreateCommand {
 }
 
 #[allow(clippy::too_many_lines)]
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let guild = cmd.guild_id.ok_or(Error::MissingId(Value::Guild))?;
     let o = &cmd.data.options();
 
@@ -302,7 +302,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             Content::new(title, description, thumbnail, questions),
         );
 
-        config.send(ctx, guild, cmd.channel_id).await?;
+        config.send(http, guild, cmd.channel_id).await?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
@@ -311,7 +311,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .embed(embed)
             .ephemeral(true);
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_MODIFY) {
@@ -359,7 +359,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         }
 
         if update {
-            config.send(ctx, guild, cmd.channel_id).await?;
+            config.send(http, guild, cmd.channel_id).await?;
         } else {
             config.write().await?;
         }
@@ -371,7 +371,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .embed(embed)
             .ephemeral(true);
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_UPDATE) {
@@ -390,7 +390,8 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             return Err(Error::Other("The user's application is already finalized"));
         }
 
-        form.update(ctx, guild, config.role, status, reason).await?;
+        form.update(http, guild, config.role, status, reason)
+            .await?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
@@ -399,7 +400,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .embed(embed)
             .ephemeral(true);
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_REMOVE) {
@@ -407,13 +408,13 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         let config = Config::read(guild).await?;
 
         let form = Form::read((guild, user.id)).await?;
-        let mut member = guild.member(ctx, user.id).await?;
+        let mut member = guild.member(http, user.id).await?;
 
         if let Ok(anchor) = form.anchor() {
-            anchor.to_message(ctx).await?.delete(ctx).await?;
+            anchor.to_message(http).await?.delete(http).await?;
         }
         if member.roles.contains(&config.role) {
-            member.remove_role(ctx, config.role).await?;
+            member.remove_role(http, config.role).await?;
         }
 
         form.remove().await?;
@@ -425,14 +426,14 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .embed(embed)
             .ephemeral(true);
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else {
         Err(Error::InvalidId(Value::Command, cmd.data.name.clone()))
     }
 }
-pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Result<()> {
+pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Result<()> {
     let custom_id = CustomId::try_from(cpn.data.custom_id.as_str())?;
     let guild = cpn.guild_id.ok_or(Error::MissingId(Value::Guild))?;
 
@@ -449,12 +450,12 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
 
             let modal = Config::read(guild).await?.as_modal(());
 
-            cpn.create_response(ctx, CreateInteractionResponse::Modal(modal))
+            cpn.create_response(http, CreateInteractionResponse::Modal(modal))
                 .await
                 .map_err(Error::from)
         }
         CM_ABOUT => {
-            let user = ctx.http.get_current_user().await?;
+            let user = http.get_current_user().await?;
             let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
             let embed = CreateEmbed::new()
                 .author(author)
@@ -466,7 +467,7 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
                 .embed(embed)
                 .ephemeral(true);
 
-            cpn.create_response(ctx, CreateInteractionResponse::Message(message))
+            cpn.create_response(http, CreateInteractionResponse::Message(message))
                 .await
                 .map_err(Error::from)
         }
@@ -488,14 +489,14 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
 
             let modal = Form::read((guild, user)).await?.as_modal(status);
 
-            cpn.create_response(ctx, CreateInteractionResponse::Modal(modal))
+            cpn.create_response(http, CreateInteractionResponse::Modal(modal))
                 .await
                 .map_err(Error::from)
         }
         _ => Err(Error::InvalidId(Value::Component, custom_id.name)),
     }
 }
-pub async fn run_modal(ctx: &Context, mdl: &ModalInteraction) -> Result<()> {
+pub async fn run_modal(http: &Http, mdl: &ModalInteraction) -> Result<()> {
     let custom_id = CustomId::try_from(mdl.data.custom_id.as_str())?;
     let guild = mdl.guild_id.ok_or(Error::MissingId(Value::Guild))?;
     let o = &mdl.data.components;
@@ -510,9 +511,9 @@ pub async fn run_modal(ctx: &Context, mdl: &ModalInteraction) -> Result<()> {
 
             let mut form = Form::new(mdl.user.id, answers);
 
-            form.send(ctx, guild, config.channel).await?;
+            form.send(http, guild, config.channel).await?;
 
-            mdl.create_response(ctx, CreateInteractionResponse::Acknowledge)
+            mdl.create_response(http, CreateInteractionResponse::Acknowledge)
                 .await
                 .map_err(Error::from)
         }
@@ -538,9 +539,10 @@ pub async fn run_modal(ctx: &Context, mdl: &ModalInteraction) -> Result<()> {
             let reason = get_input_text(o, OP_REASON).ok();
             let mut form = Form::read((guild, user)).await?;
 
-            form.update(ctx, guild, config.role, status, reason).await?;
+            form.update(http, guild, config.role, status, reason)
+                .await?;
 
-            mdl.create_response(ctx, CreateInteractionResponse::Acknowledge)
+            mdl.create_response(http, CreateInteractionResponse::Acknowledge)
                 .await
                 .map_err(Error::from)
         }

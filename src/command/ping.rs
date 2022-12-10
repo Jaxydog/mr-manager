@@ -9,22 +9,22 @@ pub fn new() -> CreateCommand {
         .dm_permission(true)
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let mut embed = CreateEmbed::new().color(BOT_COLOR).title("Calculating...");
     let message = CreateInteractionResponseMessage::new()
         .embed(embed.clone())
         .ephemeral(true);
 
-    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+    cmd.create_response(http, CreateInteractionResponse::Message(message))
         .await?;
 
-    let res = cmd.get_response(ctx).await?;
+    let res = cmd.get_response(http).await?;
     let sent = res.id.created_at().timestamp_millis();
     let received = cmd.id.created_at().timestamp_millis();
     let ms = sent - received;
 
     embed = embed.title(format!("Pong! ({ms}ms)"));
-    cmd.edit_response(ctx, EditInteractionResponse::new().embed(embed))
+    cmd.edit_response(http, EditInteractionResponse::new().embed(embed))
         .await?;
 
     Ok(())

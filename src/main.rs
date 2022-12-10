@@ -29,8 +29,11 @@ async fn main() -> Result<()> {
 
 async fn clock(_logger: Logger) -> Result<()> {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
+    let http = Arc::new(Http::new(&token()?));
 
     loop {
         interval.tick().await;
+
+        poll::check(&http).await?;
     }
 }

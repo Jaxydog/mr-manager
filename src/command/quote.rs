@@ -22,11 +22,11 @@ pub fn new() -> CreateCommand {
         )
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let o = &cmd.data.options();
 
     let user = get_user(o, OP_USER)?;
-    let user = ctx.http.get_user(user.0.id).await?;
+    let user = http.get_user(user.0.id).await?;
 
     if user == cmd.user {
         return Err(Error::Other("You cannot quote yourself"));
@@ -44,7 +44,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .description(format!("> {text}"));
 
     let message = CreateInteractionResponseMessage::new().embed(embed);
-    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+    cmd.create_response(http, CreateInteractionResponse::Message(message))
         .await
         .map_err(Error::from)
 }

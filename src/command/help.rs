@@ -9,9 +9,9 @@ pub fn new() -> CreateCommand {
         .dm_permission(false)
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let user = ctx.http.get_current_user().await?;
-    let mut commands = ctx.http.get_global_application_commands().await?;
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
+    let user = http.get_current_user().await?;
+    let mut commands = http.get_global_application_commands().await?;
     let mut description = include_str!(r"..\include\help\start.txt").to_string();
 
     if commands.is_empty() {
@@ -44,7 +44,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .embed(embed)
         .ephemeral(true);
 
-    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+    cmd.create_response(http, CreateInteractionResponse::Message(message))
         .await
         .map_err(Error::from)
 }

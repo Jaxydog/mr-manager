@@ -9,8 +9,8 @@ pub fn new() -> CreateCommand {
         .dm_permission(true)
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let user = ctx.http.get_current_user().await?;
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
+    let user = http.get_current_user().await?;
     let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
     let embed = CreateEmbed::new()
         .author(author)
@@ -21,7 +21,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .embed(embed)
         .ephemeral(true);
 
-    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+    cmd.create_response(http, CreateInteractionResponse::Message(message))
         .await
         .map_err(Error::from)
 }

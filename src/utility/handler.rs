@@ -110,33 +110,34 @@ impl EventHandler for Handler {
 
         self.info(format!("Received: {name}"));
 
+        let http = &ctx.http;
         let result: Result<()> = match &mut int {
             Interaction::Command(i) => match i.data.name.as_str() {
-                apply::NAME => apply::run_command(&ctx, i).await,
-                data::NAME => data::run_command(&ctx, i).await,
-                embed::NAME => embed::run_command(&ctx, i).await,
-                help::NAME => help::run_command(&ctx, i).await,
-                offer::NAME => offer::run_command(&ctx, i).await,
-                oracle::NAME => oracle::run_command(&ctx, i).await,
-                ping::NAME => ping::run_command(&ctx, i).await,
-                poll::NAME => poll::run_command(&ctx, i).await,
-                quote::NAME => quote::run_command(&ctx, i).await,
-                role::NAME => role::run_command(&ctx, i).await,
+                apply::NAME => apply::run_command(http, i).await,
+                data::NAME => data::run_command(http, i).await,
+                embed::NAME => embed::run_command(http, i).await,
+                help::NAME => help::run_command(http, i).await,
+                offer::NAME => offer::run_command(http, i).await,
+                oracle::NAME => oracle::run_command(http, i).await,
+                ping::NAME => ping::run_command(http, i).await,
+                poll::NAME => poll::run_command(http, i).await,
+                quote::NAME => quote::run_command(http, i).await,
+                role::NAME => role::run_command(http, i).await,
                 _ => Err(Error::InvalidValue(Value::Command, id)),
             },
             Interaction::Component(i) => match CustomId::try_from(i.data.custom_id.as_str()) {
                 Ok(c) => match c.base.as_str() {
-                    apply::NAME => apply::run_component(&ctx, i).await,
-                    poll::NAME => poll::run_component(&ctx, i).await,
-                    role::NAME => role::run_component(&ctx, i).await,
+                    apply::NAME => apply::run_component(http, i).await,
+                    poll::NAME => poll::run_component(http, i).await,
+                    role::NAME => role::run_component(http, i).await,
                     _ => Err(Error::InvalidValue(Value::Component, id)),
                 },
                 Err(e) => Err(e),
             },
             Interaction::Modal(i) => match CustomId::try_from(i.data.custom_id.as_str()) {
                 Ok(c) => match c.base.as_str() {
-                    apply::NAME => apply::run_modal(&ctx, i).await,
-                    poll::NAME => poll::run_modal(&ctx, i).await,
+                    apply::NAME => apply::run_modal(http, i).await,
+                    poll::NAME => poll::run_modal(http, i).await,
                     _ => Err(Error::InvalidValue(Value::Modal, id)),
                 },
                 Err(e) => Err(e),

@@ -16,7 +16,7 @@ pub trait TryAsButtonAsync: Send + Sync {
 
     async fn try_as_button(
         &self,
-        ctx: &Context,
+        http: &Http,
         disabled: bool,
         args: Self::Args<'_>,
     ) -> Result<CreateButton>;
@@ -25,7 +25,7 @@ pub trait TryAsButtonAsync: Send + Sync {
 pub trait AsButtonAsync: Send + Sync {
     type Args<'a>: Send + Sync;
 
-    async fn as_button(&self, ctx: &Context, disabled: bool, args: Self::Args<'_>) -> CreateButton;
+    async fn as_button(&self, http: &Http, disabled: bool, args: Self::Args<'_>) -> CreateButton;
 }
 
 impl<T: AsButton> TryAsButton for T {
@@ -41,11 +41,11 @@ impl<T: AsButtonAsync> TryAsButtonAsync for T {
 
     async fn try_as_button(
         &self,
-        ctx: &Context,
+        http: &Http,
         disabled: bool,
         args: Self::Args<'_>,
     ) -> Result<CreateButton> {
-        Ok(self.as_button(ctx, disabled, args).await)
+        Ok(self.as_button(http, disabled, args).await)
     }
 }
 
@@ -65,7 +65,7 @@ pub trait TryAsButtonVecAsync: Send + Sync {
 
     async fn try_as_buttons(
         &self,
-        ctx: &Context,
+        http: &Http,
         disabled: bool,
         args: Self::Args<'_>,
     ) -> Result<Vec<CreateButton>>;
@@ -76,7 +76,7 @@ pub trait AsButtonVecAsync: Send + Sync {
 
     async fn as_buttons(
         &self,
-        ctx: &Context,
+        http: &Http,
         disabled: bool,
         args: Self::Args<'_>,
     ) -> Vec<CreateButton>;
@@ -95,11 +95,11 @@ impl<T: AsButtonVecAsync> TryAsButtonVecAsync for T {
 
     async fn try_as_buttons(
         &self,
-        ctx: &Context,
+        http: &Http,
         disabled: bool,
         args: Self::Args<'_>,
     ) -> Result<Vec<CreateButton>> {
-        Ok(self.as_buttons(ctx, disabled, args).await)
+        Ok(self.as_buttons(http, disabled, args).await)
     }
 }
 
@@ -117,13 +117,13 @@ pub trait AsEmbed {
 pub trait TryAsEmbedAsync: Send + Sync {
     type Args<'a>: Send + Sync;
 
-    async fn try_as_embed(&self, ctx: &Context, args: Self::Args<'_>) -> Result<CreateEmbed>;
+    async fn try_as_embed(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateEmbed>;
 }
 #[async_trait]
 pub trait AsEmbedAsync: Send + Sync {
     type Args<'a>: Send + Sync;
 
-    async fn as_embed(&self, ctx: &Context, args: Self::Args<'_>) -> CreateEmbed;
+    async fn as_embed(&self, http: &Http, args: Self::Args<'_>) -> CreateEmbed;
 }
 
 impl<T: AsEmbed> TryAsEmbed for T {
@@ -137,8 +137,8 @@ impl<T: AsEmbed> TryAsEmbed for T {
 impl<T: AsEmbedAsync> TryAsEmbedAsync for T {
     type Args<'a> = <Self as AsEmbedAsync>::Args<'a>;
 
-    async fn try_as_embed(&self, ctx: &Context, args: Self::Args<'_>) -> Result<CreateEmbed> {
-        Ok(self.as_embed(ctx, args).await)
+    async fn try_as_embed(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateEmbed> {
+        Ok(self.as_embed(http, args).await)
     }
 }
 
@@ -156,13 +156,13 @@ pub trait AsModal {
 pub trait TryAsModalAsync: Send + Sync {
     type Args<'a>: Send + Sync;
 
-    async fn try_as_modal(&self, ctx: &Context, args: Self::Args<'_>) -> Result<CreateModal>;
+    async fn try_as_modal(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateModal>;
 }
 #[async_trait]
 pub trait AsModalAsync: Send + Sync {
     type Args<'a>: Send + Sync;
 
-    async fn as_modal(&self, ctx: &Context, args: Self::Args<'_>) -> CreateModal;
+    async fn as_modal(&self, http: &Http, args: Self::Args<'_>) -> CreateModal;
 }
 
 impl<T: AsModal> TryAsModal for T {
@@ -176,7 +176,7 @@ impl<T: AsModal> TryAsModal for T {
 impl<T: AsModalAsync> TryAsModalAsync for T {
     type Args<'a> = <Self as AsModalAsync>::Args<'a>;
 
-    async fn try_as_modal(&self, ctx: &Context, args: Self::Args<'_>) -> Result<CreateModal> {
-        Ok(self.as_modal(ctx, args).await)
+    async fn try_as_modal(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateModal> {
+        Ok(self.as_modal(http, args).await)
     }
 }

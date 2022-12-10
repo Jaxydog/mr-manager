@@ -89,8 +89,8 @@ pub fn new() -> CreateCommand {
         )
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let name = cmd.user.id.to_user(ctx).await?.tag();
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
+    let name = cmd.user.id.to_user(http).await?.tag();
     let o = &cmd.data.options();
     let query = get_str(o, OP_QUESTION)?;
 
@@ -99,7 +99,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
     let embed = reply.as_embed((&name, query));
 
     let message = CreateInteractionResponseMessage::new().embed(embed);
-    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+    cmd.create_response(http, CreateInteractionResponse::Message(message))
         .await
         .map_err(Error::from)
 }

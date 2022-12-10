@@ -123,7 +123,7 @@ pub fn new() -> CreateCommand {
         ))
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let o = &cmd.data.options();
     let mut embed = CreateEmbed::new();
     let mut count = 0;
@@ -146,7 +146,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
 
     if let Ok(hex) = get_str(o, OP_EMBED_COLOR) {
         let color = if hex.is_empty() {
-            let user = ctx.http.get_user(cmd.user.id).await?;
+            let user = http.get_user(cmd.user.id).await?;
 
             user.accent_colour
         } else {
@@ -208,7 +208,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .embed(embed)
         .ephemeral(ephemeral);
 
-    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+    cmd.create_response(http, CreateInteractionResponse::Message(message))
         .await
         .map_err(Error::from)
 }

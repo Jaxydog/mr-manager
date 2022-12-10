@@ -46,8 +46,8 @@ impl Config {
             anchor: None,
         }
     }
-    pub async fn send(&mut self, ctx: &Context, guild: GuildId, channel: ChannelId) -> Result<()> {
-        let embed = self.try_as_embed(ctx, guild).await?;
+    pub async fn send(&mut self, http: &Http, guild: GuildId, channel: ChannelId) -> Result<()> {
+        let embed = self.try_as_embed(http, guild).await?;
         let mut builder = CreateMessage::new().embed(embed);
 
         for button in self.as_buttons(false, ()) {
@@ -55,12 +55,12 @@ impl Config {
         }
 
         if let Some(anchor) = self.anchor {
-            if let Ok(message) = anchor.to_message(ctx).await {
-                message.delete(ctx).await?;
+            if let Ok(message) = anchor.to_message(http).await {
+                message.delete(http).await?;
             }
         }
 
-        let message = channel.send_message(ctx, builder).await?;
+        let message = channel.send_message(http, builder).await?;
         self.anchor = Some(Anchor::try_from(message)?);
         self.write().await
     }
@@ -90,8 +90,8 @@ impl TryAsReq for Config {
 impl TryAsEmbedAsync for Config {
     type Args<'a> = GuildId;
 
-    async fn try_as_embed(&self, ctx: &Context, guild: Self::Args<'_>) -> Result<CreateEmbed> {
-        let guild = ctx.http.get_guild(guild).await?;
+    async fn try_as_embed(&self, http: &Http, guild: Self::Args<'_>) -> Result<CreateEmbed> {
+        let guild = http.get_guild(guild).await?;
         let footer = CreateEmbedFooter::new(format!("Questions: {}", self.content.questions.len()));
         let mut author = CreateEmbedAuthor::new(&guild.name);
 

@@ -10,20 +10,20 @@ pub struct Anchor {
 impl Anchor {
     const __URL: &str = "https://discord.com/channels";
 
-    pub async fn to_guild(self, ctx: &Context) -> Result<PartialGuild> {
-        Ok(self.guild.to_partial_guild(ctx).await?)
+    pub async fn to_guild(self, http: &Http) -> Result<PartialGuild> {
+        Ok(self.guild.to_partial_guild(http).await?)
     }
-    pub async fn to_channel(self, ctx: &Context) -> Result<GuildChannel> {
-        let guild = self.to_guild(ctx).await?;
-        let mut list = guild.channels(ctx).await?;
+    pub async fn to_channel(self, http: &Http) -> Result<GuildChannel> {
+        let guild = self.to_guild(http).await?;
+        let mut list = guild.channels(http).await?;
 
         list.remove(&self.channel)
             .ok_or_else(|| Error::InvalidId(Value::Channel, self.guild.to_string()))
     }
-    pub async fn to_message(self, ctx: &Context) -> Result<Message> {
-        let channel = self.to_channel(ctx).await?;
+    pub async fn to_message(self, http: &Http) -> Result<Message> {
+        let channel = self.to_channel(http).await?;
 
-        Ok(channel.message(ctx, self.message).await?)
+        Ok(channel.message(http, self.message).await?)
     }
 }
 
@@ -31,6 +31,22 @@ impl TryFrom<Message> for Anchor {
     type Error = Error;
 
     fn try_from(value: Message) -> Result<Self> {
+        let Some(guild) = value.guild_id else {
+			return Err(Error::MissingId(Value::Guild))
+		};
+
+        Ok(Self {
+            guild,
+            channel: value.channel_id,
+            message: value.id,
+        })
+    }
+}
+
+impl TryFrom<&Message> for Anchor {
+    type Error = Error;
+
+    fn try_from(value: &Message) -> Result<Self> {
         let Some(guild) = value.guild_id else {
 			return Err(Error::MissingId(Value::Guild))
 		};

@@ -31,32 +31,50 @@ impl Output {
             Self::TextResponse(o) => o.pages(),
         }
     }
+    pub fn wrap_page(&self, page: usize) -> usize {
+        let pages = self.pages();
+
+        if page == 0 {
+            pages
+        } else if page > pages {
+            1
+        } else {
+            pages
+        }
+    }
 }
 
 #[async_trait]
 impl TryAsEmbedAsync for Output {
     type Args<'a> = (&'a Poll, usize);
 
-    async fn try_as_embed(
-        &self,
-        ctx: &Context,
-        (poll, page): Self::Args<'_>,
-    ) -> Result<CreateEmbed> {
-        let pages = self.pages();
-
-        let page = if page == 0 {
-            pages
-        } else if page > pages {
-            1
-        } else {
-            pages
-        };
+    async fn try_as_embed(&self, http: &Http, (poll, page): Self::Args<'_>) -> Result<CreateEmbed> {
+        let page = self.wrap_page(page);
 
         match self {
-            Self::MultipleChoice(o) => o.try_as_embed(ctx, (poll, page)).await,
-            Self::RandomRaffle(o) => o.try_as_embed(ctx, (poll, page)).await,
-            Self::TextResponse(o) => o.try_as_embed(ctx, (poll, page)).await,
+            Self::MultipleChoice(o) => o.try_as_embed(http, (poll, page)).await,
+            Self::RandomRaffle(o) => o.try_as_embed(http, (poll, page)).await,
+            Self::TextResponse(o) => o.try_as_embed(http, (poll, page)).await,
         }
+    }
+}
+
+impl AsButtonVec for Output {
+    type Args<'a> = usize;
+
+    fn as_buttons(&self, disabled: bool, page: Self::Args<'_>) -> Vec<CreateButton> {
+        let page = self.wrap_page(page);
+        let disabled = disabled || self.pages() == 1;
+        let last = CreateButton::new(CustomId::new(CM_LAST).arg(page - 1))
+            .disabled(disabled)
+            .emoji('⬅')
+            .style(ButtonStyle::Primary);
+        let next = CreateButton::new(CustomId::new(CM_NEXT).arg(page + 1))
+            .disabled(disabled)
+            .emoji('➡')
+            .style(ButtonStyle::Primary);
+
+        vec![last, next]
     }
 }
 
@@ -98,8 +116,8 @@ impl MultipleChoiceOutput {
         format!("`{fill: >32}`")
     }
 
-    async fn __overview(&self, ctx: &Context, poll: &Poll) -> Result<CreateEmbed> {
-        let user = ctx.http.get_user(poll.user).await?;
+    async fn __overview(&self, http: &Http, poll: &Poll) -> Result<CreateEmbed> {
+        let user = http.get_user(poll.user).await?;
 
         let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
         let footer = CreateEmbedFooter::new(format!("Page: 1 / {}", self.pages()));
@@ -131,7 +149,7 @@ impl MultipleChoiceOutput {
             Ok(embed)
         }
     }
-    async fn __page(&self, ctx: &Context, poll: &Poll, page: usize) -> Result<CreateEmbed> {
+    async fn __page(&self, http: &Http, poll: &Poll, page: usize) -> Result<CreateEmbed> {
         let index = page - 2;
 
         let Some(entry) = self.entries.get(index) else {
@@ -141,7 +159,7 @@ impl MultipleChoiceOutput {
 			return Err(Error::MissingValue(Value::Other("Input")));
 		};
 
-        let user = ctx.http.get_user(poll.user).await?;
+        let user = http.get_user(poll.user).await?;
 
         let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
         let footer = CreateEmbedFooter::new(format!("Page: {page} / {}", self.pages()));
@@ -182,15 +200,11 @@ impl MultipleChoiceOutput {
 impl TryAsEmbedAsync for MultipleChoiceOutput {
     type Args<'a> = (&'a Poll, usize);
 
-    async fn try_as_embed(
-        &self,
-        ctx: &Context,
-        (poll, page): Self::Args<'_>,
-    ) -> Result<CreateEmbed> {
+    async fn try_as_embed(&self, http: &Http, (poll, page): Self::Args<'_>) -> Result<CreateEmbed> {
         if page == 1 {
-            self.__overview(ctx, poll).await
+            self.__overview(http, poll).await
         } else {
-            self.__page(ctx, poll, page).await
+            self.__page(http, poll, page).await
         }
     }
 }
@@ -207,8 +221,8 @@ impl RandomRaffleOutput {
         1
     }
 
-    async fn __overview(&self, ctx: &Context, poll: &Poll) -> Result<CreateEmbed> {
-        let user = ctx.http.get_user(poll.user).await?;
+    async fn __overview(&self, http: &Http, poll: &Poll) -> Result<CreateEmbed> {
+        let user = http.get_user(poll.user).await?;
 
         let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
         let footer = CreateEmbedFooter::new(format!("Page: 1 / {}", self.pages()));
@@ -248,8 +262,8 @@ impl RandomRaffleOutput {
 impl TryAsEmbedAsync for RandomRaffleOutput {
     type Args<'a> = (&'a Poll, usize);
 
-    async fn try_as_embed(&self, ctx: &Context, (poll, _): Self::Args<'_>) -> Result<CreateEmbed> {
-        self.__overview(ctx, poll).await
+    async fn try_as_embed(&self, http: &Http, (poll, _): Self::Args<'_>) -> Result<CreateEmbed> {
+        self.__overview(http, poll).await
     }
 }
 
@@ -264,8 +278,8 @@ impl TextResponseOutput {
         self.answers.len() + 1
     }
 
-    async fn __overview(&self, ctx: &Context, poll: &Poll) -> Result<CreateEmbed> {
-        let user = ctx.http.get_user(poll.user).await?;
+    async fn __overview(&self, http: &Http, poll: &Poll) -> Result<CreateEmbed> {
+        let user = http.get_user(poll.user).await?;
 
         let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
         let footer = CreateEmbedFooter::new(format!("Page: 1 / {}", self.pages()));
@@ -285,14 +299,14 @@ impl TextResponseOutput {
             Ok(embed)
         }
     }
-    async fn __page(&self, ctx: &Context, poll: &Poll, page: usize) -> Result<CreateEmbed> {
+    async fn __page(&self, http: &Http, poll: &Poll, page: usize) -> Result<CreateEmbed> {
         let index = page - 2;
 
         let Some((user, answers)) = self.answers.iter().nth(index) else {
 			return Err(Error::MissingValue(Value::Other("Entry")));
 		};
 
-        let user = ctx.http.get_user(poll.user).await?;
+        let user = http.get_user(poll.user).await?;
 
         let author = if poll.content.hide_members {
             CreateEmbedAuthor::new("Anonymous User").icon_url(user.default_avatar_url())
@@ -344,15 +358,11 @@ impl TextResponseOutput {
 impl TryAsEmbedAsync for TextResponseOutput {
     type Args<'a> = (&'a Poll, usize);
 
-    async fn try_as_embed(
-        &self,
-        ctx: &Context,
-        (poll, page): Self::Args<'_>,
-    ) -> Result<CreateEmbed> {
+    async fn try_as_embed(&self, http: &Http, (poll, page): Self::Args<'_>) -> Result<CreateEmbed> {
         if page == 1 {
-            self.__overview(ctx, poll).await
+            self.__overview(http, poll).await
         } else {
-            self.__page(ctx, poll, page).await
+            self.__page(http, poll, page).await
         }
     }
 }

@@ -43,8 +43,8 @@ pub fn new() -> CreateCommand {
         )
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
-    let user = ctx.http.get_user(cmd.user.id).await?;
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
+    let user = http.get_user(cmd.user.id).await?;
 
     let o = &cmd.data.options();
     let offer = get_str(o, OP_OFFER)?;
@@ -62,7 +62,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         .thumbnail(user.face());
 
     let message = CreateInteractionResponseMessage::new().embed(embed);
-    cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+    cmd.create_response(http, CreateInteractionResponse::Message(message))
         .await
         .map_err(Error::from)
 }

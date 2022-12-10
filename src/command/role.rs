@@ -25,11 +25,11 @@ impl TryAsButtonAsync for Toggle {
 
     async fn try_as_button(
         &self,
-        ctx: &Context,
+        http: &Http,
         disabled: bool,
         guild: Self::Args<'_>,
     ) -> Result<CreateButton> {
-        let mut roles = guild.roles(ctx).await?;
+        let mut roles = guild.roles(http).await?;
         let Some(role) = roles.remove(&self.role) else {
 			return Err(Error::InvalidId(Value::Role, self.role.to_string()))
 		};
@@ -136,7 +136,7 @@ pub fn new() -> CreateCommand {
         )
 }
 
-pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> {
+pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let Some(guild) = cmd.guild_id else {
 		return Err(Error::MissingValue(Value::Guild));
 	};
@@ -164,7 +164,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .embed(embed)
             .ephemeral(true);
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_REMOVE) {
@@ -179,7 +179,7 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .embed(embed)
             .ephemeral(true);
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else if get_subcommand(o, SC_LIST).is_ok() {
@@ -189,12 +189,12 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
             .ephemeral(true);
 
         for toggle in &selector.roles {
-            let button = toggle.try_as_button(ctx, true, guild).await?;
+            let button = toggle.try_as_button(http, true, guild).await?;
 
             message = message.button(button);
         }
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_SEND) {
@@ -207,26 +207,26 @@ pub async fn run_command(ctx: &Context, cmd: &CommandInteraction) -> Result<()> 
         let mut message = CreateMessage::new().embed(embed);
 
         for toggle in &selector.roles {
-            let button = toggle.try_as_button(ctx, false, guild).await?;
+            let button = toggle.try_as_button(http, false, guild).await?;
 
             message = message.button(button);
         }
 
-        cmd.channel_id.send_message(ctx, message).await?;
+        cmd.channel_id.send_message(http, message).await?;
 
         let embed = CreateEmbed::new().color(BOT_COLOR).title("Sent selectors!");
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
 
-        cmd.create_response(ctx, CreateInteractionResponse::Message(message))
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
             .await
             .map_err(Error::from)
     } else {
         Err(Error::InvalidId(Value::Command, cmd.data.name.clone()))
     }
 }
-pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Result<()> {
+pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Result<()> {
     let custom_id = CustomId::try_from(cpn.data.custom_id.as_str())?;
 
     if custom_id.name != CM_TOGGLE {
@@ -242,12 +242,12 @@ pub async fn run_component(ctx: &Context, cpn: &mut ComponentInteraction) -> Res
     let role = RoleId::new(id);
 
     if member.roles.contains(&role) {
-        member.remove_role(ctx, role).await?;
+        member.remove_role(http, role).await?;
     } else {
-        member.add_role(ctx, role).await?;
+        member.add_role(http, role).await?;
     }
 
-    cpn.create_response(ctx, CreateInteractionResponse::Acknowledge)
+    cpn.create_response(http, CreateInteractionResponse::Acknowledge)
         .await
         .map_err(Error::from)
 }

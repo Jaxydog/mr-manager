@@ -84,23 +84,23 @@ impl Form {
 
         TimeString::new(ms).flag(TimeFlag::Relative)
     }
-    pub async fn send(&mut self, ctx: &Context, guild: GuildId, channel: ChannelId) -> Result<()> {
-        let mut builder = CreateMessage::new().embed(self.try_as_embed(ctx, guild).await?);
+    pub async fn send(&mut self, http: &Http, guild: GuildId, channel: ChannelId) -> Result<()> {
+        let mut builder = CreateMessage::new().embed(self.try_as_embed(http, guild).await?);
 
         for button in self.as_buttons(self.status != Status::Pending, ()) {
             builder = builder.button(button);
         }
 
-        let message = channel.send_message(ctx, builder).await?;
+        let message = channel.send_message(http, builder).await?;
 
         self.anchor = Some(Anchor::try_from(message)?);
         self.write().await
     }
     #[allow(clippy::match_same_arms, clippy::match_wildcard_for_single_variants)] // prevents false positives, intended
-    pub async fn notify(&self, ctx: &Context, guild: GuildId) -> Result<()> {
-        let guild = ctx.http.get_guild(guild).await?;
+    pub async fn notify(&self, http: &Http, guild: GuildId) -> Result<()> {
+        let guild = http.get_guild(guild).await?;
 
-        let Ok(channel) = self.user.create_dm_channel(ctx).await else {
+        let Ok(channel) = self.user.create_dm_channel(http).await else {
             return Ok(())
         };
 
@@ -134,43 +134,43 @@ impl Form {
             });
 
         channel
-            .send_message(ctx, CreateMessage::new().embed(embed))
+            .send_message(http, CreateMessage::new().embed(embed))
             .await?;
 
         Ok(())
     }
     pub async fn update(
         &mut self,
-        ctx: &Context,
+        http: &Http,
         guild: GuildId,
         role: RoleId,
         status: Status,
         reason: Option<impl Send + Sync + Into<String>>,
     ) -> Result<()> {
-        let mut member = guild.member(ctx, self.user).await?;
+        let mut member = guild.member(http, self.user).await?;
 
         self.status = status;
         self.reason = reason.map(Into::into);
         self.write().await?;
 
         if status == Status::Accepted {
-            member.add_role(ctx, role).await?;
+            member.add_role(http, role).await?;
         } else {
-            member.remove_role(ctx, role).await?;
+            member.remove_role(http, role).await?;
         }
 
         if let Some(anchor) = self.anchor {
-            let mut message = anchor.to_message(ctx).await?;
-            let mut builder = EditMessage::new().embed(self.try_as_embed(ctx, guild).await?);
+            let mut message = anchor.to_message(http).await?;
+            let mut builder = EditMessage::new().embed(self.try_as_embed(http, guild).await?);
 
             for button in self.as_buttons(status != Status::Pending, ()) {
                 builder = builder.button(button);
             }
 
-            message.edit(ctx, builder).await?;
+            message.edit(http, builder).await?;
         }
 
-        self.notify(ctx, guild).await
+        self.notify(http, guild).await
     }
 }
 
@@ -198,9 +198,9 @@ impl TryAsReq for Form {
 impl TryAsEmbedAsync for Form {
     type Args<'a> = GuildId;
 
-    async fn try_as_embed(&self, ctx: &Context, guild: Self::Args<'_>) -> Result<CreateEmbed> {
+    async fn try_as_embed(&self, http: &Http, guild: Self::Args<'_>) -> Result<CreateEmbed> {
         let config = Config::read(guild).await?;
-        let user = ctx.http.get_user(self.user).await?;
+        let user = http.get_user(self.user).await?;
 
         let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
         let color = user.accent_colour.unwrap_or(BOT_COLOR);
