@@ -1,182 +1,86 @@
 use crate::prelude::*;
 
-pub trait TryAsButton {
-    type Args<'a>;
-
-    fn try_as_button(&self, disabled: bool, args: Self::Args<'_>) -> Result<CreateButton>;
+pub trait TryAsButton<T> {
+    fn try_as_button(&self, disabled: bool, _: T) -> Result<CreateButton>;
 }
-pub trait AsButton {
-    type Args<'a>;
-
-    fn as_button(&self, disabled: bool, args: Self::Args<'_>) -> CreateButton;
+pub trait AsButton<T> {
+    fn as_button(&self, disabled: bool, _: T) -> CreateButton;
 }
 #[async_trait]
-pub trait TryAsButtonAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn try_as_button(
-        &self,
-        http: &Http,
-        disabled: bool,
-        args: Self::Args<'_>,
-    ) -> Result<CreateButton>;
-}
-#[async_trait]
-pub trait AsButtonAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn as_button(&self, http: &Http, disabled: bool, args: Self::Args<'_>) -> CreateButton;
+pub trait AsButtonAsync<T: Send + Sync> {
+    async fn as_button(&self, http: &Http, disabled: bool, _: T) -> Result<CreateButton>;
 }
 
-impl<T: AsButton> TryAsButton for T {
-    type Args<'a> = <Self as AsButton>::Args<'a>;
-
-    fn try_as_button(&self, disabled: bool, args: Self::Args<'_>) -> Result<CreateButton> {
-        Ok(self.as_button(disabled, args))
-    }
-}
-#[async_trait]
-impl<T: AsButtonAsync> TryAsButtonAsync for T {
-    type Args<'a> = <Self as AsButtonAsync>::Args<'a>;
-
-    async fn try_as_button(
-        &self,
-        http: &Http,
-        disabled: bool,
-        args: Self::Args<'_>,
-    ) -> Result<CreateButton> {
-        Ok(self.as_button(http, disabled, args).await)
+impl<T: AsButton<A>, A> TryAsButton<A> for T {
+    fn try_as_button(&self, disabled: bool, value: A) -> Result<CreateButton> {
+        Ok(self.as_button(disabled, value))
     }
 }
 
-pub trait TryAsButtonVec {
-    type Args<'a>;
-
-    fn try_as_buttons(&self, disabled: bool, args: Self::Args<'_>) -> Result<Vec<CreateButton>>;
+pub trait TryAsButtonVec<T> {
+    fn try_as_buttons(&self, disabled: bool, _: T) -> Result<Vec<CreateButton>>;
 }
-pub trait AsButtonVec {
-    type Args<'a>;
-
-    fn as_buttons(&self, disabled: bool, args: Self::Args<'_>) -> Vec<CreateButton>;
+pub trait AsButtonVec<T> {
+    fn as_buttons(&self, disabled: bool, _: T) -> Vec<CreateButton>;
 }
 #[async_trait]
-pub trait TryAsButtonVecAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn try_as_buttons(
-        &self,
-        http: &Http,
-        disabled: bool,
-        args: Self::Args<'_>,
-    ) -> Result<Vec<CreateButton>>;
-}
-#[async_trait]
-pub trait AsButtonVecAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn as_buttons(
-        &self,
-        http: &Http,
-        disabled: bool,
-        args: Self::Args<'_>,
-    ) -> Vec<CreateButton>;
+pub trait AsButtonVecAsync<T: Send + Sync> {
+    async fn as_buttons(&self, http: &Http, disabled: bool, _: T) -> Result<Vec<CreateButton>>;
 }
 
-impl<T: AsButtonVec> TryAsButtonVec for T {
-    type Args<'a> = <Self as AsButtonVec>::Args<'a>;
-
-    fn try_as_buttons(&self, disabled: bool, args: Self::Args<'_>) -> Result<Vec<CreateButton>> {
-        Ok(self.as_buttons(disabled, args))
-    }
-}
-#[async_trait]
-impl<T: AsButtonVecAsync> TryAsButtonVecAsync for T {
-    type Args<'a> = <Self as AsButtonVecAsync>::Args<'a>;
-
-    async fn try_as_buttons(
-        &self,
-        http: &Http,
-        disabled: bool,
-        args: Self::Args<'_>,
-    ) -> Result<Vec<CreateButton>> {
-        Ok(self.as_buttons(http, disabled, args).await)
+impl<T: AsButtonVec<A>, A> TryAsButtonVec<A> for T {
+    fn try_as_buttons(&self, disabled: bool, value: A) -> Result<Vec<CreateButton>> {
+        Ok(self.as_buttons(disabled, value))
     }
 }
 
-pub trait TryAsEmbed {
-    type Args<'a>;
-
-    fn try_as_embed(&self, args: Self::Args<'_>) -> Result<CreateEmbed>;
+pub trait TryAsEmbed<T> {
+    fn try_as_embed(&self, _: T) -> Result<CreateEmbed>;
 }
-pub trait AsEmbed {
-    type Args<'a>;
-
-    fn as_embed(&self, args: Self::Args<'_>) -> CreateEmbed;
+pub trait AsEmbed<T> {
+    fn as_embed(&self, _: T) -> CreateEmbed;
 }
 #[async_trait]
-pub trait TryAsEmbedAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn try_as_embed(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateEmbed>;
-}
-#[async_trait]
-pub trait AsEmbedAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn as_embed(&self, http: &Http, args: Self::Args<'_>) -> CreateEmbed;
+pub trait AsEmbedAsync<T: Send + Sync> {
+    async fn as_embed(&self, http: &Http, _: T) -> Result<CreateEmbed>;
 }
 
-impl<T: AsEmbed> TryAsEmbed for T {
-    type Args<'a> = <Self as AsEmbed>::Args<'a>;
-
-    fn try_as_embed(&self, args: Self::Args<'_>) -> Result<CreateEmbed> {
-        Ok(self.as_embed(args))
-    }
-}
-#[async_trait]
-impl<T: AsEmbedAsync> TryAsEmbedAsync for T {
-    type Args<'a> = <Self as AsEmbedAsync>::Args<'a>;
-
-    async fn try_as_embed(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateEmbed> {
-        Ok(self.as_embed(http, args).await)
+impl<T: AsEmbed<A>, A> TryAsEmbed<A> for T {
+    fn try_as_embed(&self, value: A) -> Result<CreateEmbed> {
+        Ok(self.as_embed(value))
     }
 }
 
-pub trait TryAsModal {
-    type Args<'a>;
-
-    fn try_as_modal(&self, args: Self::Args<'_>) -> Result<CreateModal>;
+pub trait TryAsMessage<T> {
+    fn try_as_message(&self, _: T) -> Result<CreateMessage>;
 }
-pub trait AsModal {
-    type Args<'a>;
-
-    fn as_modal(&self, args: Self::Args<'_>) -> CreateModal;
+pub trait AsMessage<T> {
+    fn as_message(&self, _: T) -> CreateMessage;
 }
 #[async_trait]
-pub trait TryAsModalAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn try_as_modal(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateModal>;
-}
-#[async_trait]
-pub trait AsModalAsync: Send + Sync {
-    type Args<'a>: Send + Sync;
-
-    async fn as_modal(&self, http: &Http, args: Self::Args<'_>) -> CreateModal;
+pub trait AsMessageAsync<T: Send + Sync> {
+    async fn as_message(&self, http: &Http, _: T) -> Result<CreateMessage>;
 }
 
-impl<T: AsModal> TryAsModal for T {
-    type Args<'a> = <Self as AsModal>::Args<'a>;
-
-    fn try_as_modal(&self, args: Self::Args<'_>) -> Result<CreateModal> {
-        Ok(self.as_modal(args))
+impl<T: AsMessage<A>, A> TryAsMessage<A> for T {
+    fn try_as_message(&self, value: A) -> Result<CreateMessage> {
+        Ok(self.as_message(value))
     }
 }
-#[async_trait]
-impl<T: AsModalAsync> TryAsModalAsync for T {
-    type Args<'a> = <Self as AsModalAsync>::Args<'a>;
 
-    async fn try_as_modal(&self, http: &Http, args: Self::Args<'_>) -> Result<CreateModal> {
-        Ok(self.as_modal(http, args).await)
+pub trait TryAsModal<T> {
+    fn try_as_modal(&self, _: T) -> Result<CreateModal>;
+}
+pub trait AsModal<T> {
+    fn as_modal(&self, _: T) -> CreateModal;
+}
+#[async_trait]
+pub trait AsModalAsync<T: Send + Sync> {
+    async fn as_modal(&self, http: &Http, _: T) -> Result<CreateModal>;
+}
+
+impl<T: AsModal<A>, A> TryAsModal<A> for T {
+    fn try_as_modal(&self, value: A) -> Result<CreateModal> {
+        Ok(self.as_modal(value))
     }
 }

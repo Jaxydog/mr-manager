@@ -315,7 +315,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
             .await
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_MODIFY) {
-        let mut config = Config::read(guild).await?;
+        let mut config = Config::read(guild)?;
         let mut update = false;
 
         if let Ok(title) = get_str(o, OP_TITLE) {
@@ -361,7 +361,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         if update {
             config.send(http, guild, cmd.channel_id).await?;
         } else {
-            config.write().await?;
+            config.try_write(())?;
         }
 
         let embed = CreateEmbed::new()
@@ -380,8 +380,8 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         let reason = get_str(o, OP_REASON).ok();
         let overwrite = get_bool(o, OP_OVERWRITE).unwrap_or(false);
 
-        let config = Config::read(guild).await?;
-        let mut form = Form::read((guild, user.id)).await?;
+        let config = Config::read(guild)?;
+        let mut form = Form::read((guild, user.id))?;
 
         if form.status == status {
             return Err(Error::Other("The application already has this status"));
@@ -405,9 +405,9 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
             .map_err(Error::from)
     } else if let Ok(o) = get_subcommand(o, SC_REMOVE) {
         let (user, _) = get_user(o, OP_USER)?;
-        let config = Config::read(guild).await?;
+        let config = Config::read(guild)?;
 
-        let form = Form::read((guild, user.id)).await?;
+        let form = Form::read((guild, user.id))?;
         let mut member = guild.member(http, user.id).await?;
 
         if let Ok(anchor) = form.anchor() {
@@ -417,7 +417,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
             member.remove_role(http, config.role).await?;
         }
 
-        form.remove().await?;
+        form.try_remove(())?;
 
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
@@ -439,7 +439,7 @@ pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Resul
 
     match custom_id.name.as_str() {
         CM_MODAL => {
-            if let Ok(form) = Form::read((guild, cpn.user.id)).await {
+            if let Ok(form) = Form::read((guild, cpn.user.id)) {
                 match form.status {
                     Status::Pending => return Err(Error::Other("Your application is pending")),
                     Status::Accepted => return Err(Error::Other("Your application was accepted")),
@@ -448,7 +448,7 @@ pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Resul
                 }
             }
 
-            let modal = Config::read(guild).await?.as_modal(());
+            let modal = Config::read(guild)?.as_modal(());
 
             cpn.create_response(http, CreateInteractionResponse::Modal(modal))
                 .await
@@ -487,7 +487,7 @@ pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Resul
                 _ => return Err(Error::InvalidId(Value::Component, custom_id.name)),
             };
 
-            let modal = Form::read((guild, user)).await?.as_modal(status);
+            let modal = Form::read((guild, user))?.as_modal(status);
 
             cpn.create_response(http, CreateInteractionResponse::Modal(modal))
                 .await
@@ -501,7 +501,7 @@ pub async fn run_modal(http: &Http, mdl: &ModalInteraction) -> Result<()> {
     let guild = mdl.guild_id.ok_or(Error::MissingId(Value::Guild))?;
     let o = &mdl.data.components;
 
-    let config = Config::read(guild).await?;
+    let config = Config::read(guild)?;
 
     match custom_id.name.as_str() {
         MD_SUBMIT => {
@@ -537,7 +537,7 @@ pub async fn run_modal(http: &Http, mdl: &ModalInteraction) -> Result<()> {
             let status = Status::try_from(status)?;
 
             let reason = get_input_text(o, OP_REASON).ok();
-            let mut form = Form::read((guild, user)).await?;
+            let mut form = Form::read((guild, user))?;
 
             form.update(http, guild, config.role, status, reason)
                 .await?;

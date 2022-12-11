@@ -58,10 +58,8 @@ impl Reply {
     }
 }
 
-impl AsEmbed for Reply {
-    type Args<'a> = (&'a str, &'a str);
-
-    fn as_embed(&self, (name, question): Self::Args<'_>) -> CreateEmbed {
+impl AsEmbed<(&str, &str)> for Reply {
+    fn as_embed(&self, (name, question): (&str, &str)) -> CreateEmbed {
         let author = CreateEmbedAuthor::new("The Oracle").icon_url("https://cdn.discordapp.com/attachments/730389830877577267/1044068278479355954/image.png");
         let description = format!("**{name} asked...**\n> {question}\n\n*{}*", self.text);
 

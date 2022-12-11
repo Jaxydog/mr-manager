@@ -43,6 +43,12 @@ impl TimeString {
     }
 }
 
+impl From<DateTime<Utc>> for TimeString {
+    fn from(value: DateTime<Utc>) -> Self {
+        Self::new(value.timestamp_millis())
+    }
+}
+
 impl Display for TimeString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let n = self.0 / 1000;

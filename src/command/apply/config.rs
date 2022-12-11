@@ -47,7 +47,7 @@ impl Config {
         }
     }
     pub async fn send(&mut self, http: &Http, guild: GuildId, channel: ChannelId) -> Result<()> {
-        let embed = self.try_as_embed(http, guild).await?;
+        let embed = self.as_embed(http, guild).await?;
         let mut builder = CreateMessage::new().embed(embed);
 
         for button in self.as_buttons(false, ()) {
@@ -62,7 +62,7 @@ impl Config {
 
         let message = channel.send_message(http, builder).await?;
         self.anchor = Some(Anchor::try_from(message)?);
-        self.write().await
+        self.try_write(())
     }
 }
 
@@ -72,25 +72,27 @@ impl Anchored for Config {
     }
 }
 
-impl NewReq for Config {
-    type Args = GuildId;
-
-    fn new_req(guild: Self::Args) -> Req<Self> {
+impl NewReq<GuildId> for Config {
+    fn new_req(guild: GuildId) -> Req<Self> {
         Req::new(format!("{NAME}/{guild}"), ".cfg")
     }
 }
 
-impl TryAsReq for Config {
-    fn try_as_req(&self) -> Result<Req<Self>> {
+impl TryAsReq<()> for Config {
+    fn try_as_req(&self, _: ()) -> Result<Req<Self>> {
         Ok(Self::new_req(self.anchor()?.guild))
     }
 }
 
-#[async_trait]
-impl TryAsEmbedAsync for Config {
-    type Args<'a> = GuildId;
+impl AsReq<GuildId> for Config {
+    fn as_req(&self, guild: GuildId) -> Req<Self> {
+        Self::new_req(guild)
+    }
+}
 
-    async fn try_as_embed(&self, http: &Http, guild: Self::Args<'_>) -> Result<CreateEmbed> {
+#[async_trait]
+impl AsEmbedAsync<GuildId> for Config {
+    async fn as_embed(&self, http: &Http, guild: GuildId) -> Result<CreateEmbed> {
         let guild = http.get_guild(guild).await?;
         let footer = CreateEmbedFooter::new(format!("Questions: {}", self.content.questions.len()));
         let mut author = CreateEmbedAuthor::new(&guild.name);
@@ -109,10 +111,8 @@ impl TryAsEmbedAsync for Config {
     }
 }
 
-impl AsButtonVec for Config {
-    type Args<'a> = ();
-
-    fn as_buttons(&self, disabled: bool, _: Self::Args<'_>) -> Vec<CreateButton> {
+impl AsButtonVec<()> for Config {
+    fn as_buttons(&self, disabled: bool, _: ()) -> Vec<CreateButton> {
         let modal = CreateButton::new(CM_MODAL)
             .disabled(disabled)
             .emoji('👋')
@@ -128,10 +128,8 @@ impl AsButtonVec for Config {
     }
 }
 
-impl AsModal for Config {
-    type Args<'a> = ();
-
-    fn as_modal(&self, _: Self::Args<'_>) -> CreateModal {
+impl AsModal<()> for Config {
+    fn as_modal(&self, _: ()) -> CreateModal {
         let modal = CreateModal::new(MD_SUBMIT, "Apply to Guild");
         let mut components = vec![];
 

@@ -27,13 +27,17 @@ async fn main() -> Result<()> {
     client.start_autosharded().await.map_err(Error::from)
 }
 
-async fn clock(_logger: Logger) -> Result<()> {
+async fn clock(logger: Logger) -> Result<()> {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
     let http = Arc::new(Http::new(&token()?));
 
     loop {
         interval.tick().await;
 
-        poll::check(&http).await?;
+        let result = poll::check(&http).await;
+
+        if let Err(error) = result {
+            logger.warn(error.to_string())?;
+        }
     }
 }

@@ -85,7 +85,7 @@ impl Form {
         TimeString::new(ms).flag(TimeFlag::Relative)
     }
     pub async fn send(&mut self, http: &Http, guild: GuildId, channel: ChannelId) -> Result<()> {
-        let mut builder = CreateMessage::new().embed(self.try_as_embed(http, guild).await?);
+        let mut builder = CreateMessage::new().embed(self.as_embed(http, guild).await?);
 
         for button in self.as_buttons(self.status != Status::Pending, ()) {
             builder = builder.button(button);
@@ -94,7 +94,7 @@ impl Form {
         let message = channel.send_message(http, builder).await?;
 
         self.anchor = Some(Anchor::try_from(message)?);
-        self.write().await
+        self.try_write(())
     }
     #[allow(clippy::match_same_arms, clippy::match_wildcard_for_single_variants)] // prevents false positives, intended
     pub async fn notify(&self, http: &Http, guild: GuildId) -> Result<()> {
@@ -151,7 +151,7 @@ impl Form {
 
         self.status = status;
         self.reason = reason.map(Into::into);
-        self.write().await?;
+        self.try_write(())?;
 
         if status == Status::Accepted {
             member.add_role(http, role).await?;
@@ -161,7 +161,7 @@ impl Form {
 
         if let Some(anchor) = self.anchor {
             let mut message = anchor.to_message(http).await?;
-            let mut builder = EditMessage::new().embed(self.try_as_embed(http, guild).await?);
+            let mut builder = EditMessage::new().embed(self.as_embed(http, guild).await?);
 
             for button in self.as_buttons(status != Status::Pending, ()) {
                 builder = builder.button(button);
@@ -180,26 +180,28 @@ impl Anchored for Form {
     }
 }
 
-impl NewReq for Form {
-    type Args = (GuildId, UserId);
-
-    fn new_req((guild, user): Self::Args) -> Req<Self> {
-        Req::new(format!("{NAME}/{guild}"), user.to_string())
+impl NewReq<(GuildId, UserId)> for Form {
+    fn new_req((guild, user): (GuildId, UserId)) -> Req<Self> {
+        Req::new(format!("{NAME}/{guild}"), user)
     }
 }
 
-impl TryAsReq for Form {
-    fn try_as_req(&self) -> Result<Req<Self>> {
+impl TryAsReq<()> for Form {
+    fn try_as_req(&self, _: ()) -> Result<Req<Self>> {
         Ok(Self::new_req((self.anchor()?.guild, self.user)))
     }
 }
 
-#[async_trait]
-impl TryAsEmbedAsync for Form {
-    type Args<'a> = GuildId;
+impl AsReq<GuildId> for Form {
+    fn as_req(&self, guild: GuildId) -> Req<Self> {
+        Self::new_req((guild, self.user))
+    }
+}
 
-    async fn try_as_embed(&self, http: &Http, guild: Self::Args<'_>) -> Result<CreateEmbed> {
-        let config = Config::read(guild).await?;
+#[async_trait]
+impl AsEmbedAsync<GuildId> for Form {
+    async fn as_embed(&self, http: &Http, guild: GuildId) -> Result<CreateEmbed> {
+        let config = Config::read(guild)?;
         let user = http.get_user(self.user).await?;
 
         let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
@@ -234,10 +236,8 @@ impl TryAsEmbedAsync for Form {
     }
 }
 
-impl AsButtonVec for Form {
-    type Args<'a> = ();
-
-    fn as_buttons(&self, disabled: bool, _: Self::Args<'_>) -> Vec<CreateButton> {
+impl AsButtonVec<()> for Form {
+    fn as_buttons(&self, disabled: bool, _: ()) -> Vec<CreateButton> {
         let accept = CreateButton::new(CustomId::new(CM_ACCEPT).arg(self.user.to_string()))
             .disabled(disabled)
             .emoji('👍')
@@ -258,10 +258,8 @@ impl AsButtonVec for Form {
     }
 }
 
-impl AsModal for Form {
-    type Args<'a> = Status;
-
-    fn as_modal(&self, status: Self::Args<'_>) -> CreateModal {
+impl AsModal<Status> for Form {
+    fn as_modal(&self, status: Status) -> CreateModal {
         let custom_id = CustomId::new(MD_UPDATE)
             .arg(self.user.to_string())
             .arg((status as u8).to_string());

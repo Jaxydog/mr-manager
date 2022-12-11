@@ -20,15 +20,8 @@ pub struct Toggle {
 }
 
 #[async_trait]
-impl TryAsButtonAsync for Toggle {
-    type Args<'a> = GuildId;
-
-    async fn try_as_button(
-        &self,
-        http: &Http,
-        disabled: bool,
-        guild: Self::Args<'_>,
-    ) -> Result<CreateButton> {
+impl AsButtonAsync<GuildId> for Toggle {
+    async fn as_button(&self, http: &Http, disabled: bool, guild: GuildId) -> Result<CreateButton> {
         let mut roles = guild.roles(http).await?;
         let Some(role) = roles.remove(&self.role) else {
 			return Err(Error::InvalidId(Value::Role, self.role.to_string()))
@@ -59,16 +52,14 @@ impl Selector {
     }
 }
 
-impl NewReq for Selector {
-    type Args = (GuildId, UserId);
-
-    fn new_req((guild, user): Self::Args) -> Req<Self> {
-        Req::new(format!("{NAME}/{guild}"), user.to_string())
+impl NewReq<(GuildId, UserId)> for Selector {
+    fn new_req((guild, user): (GuildId, UserId)) -> Req<Self> {
+        Req::new(format!("{NAME}/{guild}"), user)
     }
 }
 
-impl AsReq for Selector {
-    fn as_req(&self) -> Req<Self> {
+impl AsReq<()> for Selector {
+    fn as_req(&self, _: ()) -> Req<Self> {
         Self::new_req((self.guild, self.user))
     }
 }
@@ -142,9 +133,8 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
 	};
 
     let o = &cmd.data.options();
-    let mut selector = Selector::read((guild, cmd.user.id))
-        .await
-        .unwrap_or_else(|_| Selector::new(cmd.user.id, guild));
+    let mut selector =
+        Selector::read((guild, cmd.user.id)).unwrap_or_else(|_| Selector::new(cmd.user.id, guild));
 
     if let Ok(o) = get_subcommand(o, SC_CREATE) {
         let role = get_role(o, OP_ROLE)?;
@@ -156,7 +146,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
             role: role.id,
             icon,
         });
-        selector.write().await?;
+        selector.write(())?;
 
         let title = format!("Created \"{}\" selector!", role.name);
         let embed = CreateEmbed::new().color(BOT_COLOR).title(title);
@@ -171,7 +161,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         let role = get_role(o, OP_ROLE)?;
 
         selector.roles.retain(|t| t.role != role.id);
-        selector.write().await?;
+        selector.write(())?;
 
         let title = format!("Removed \"{}\" selector!", role.name);
         let embed = CreateEmbed::new().color(BOT_COLOR).title(title);
@@ -189,7 +179,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
             .ephemeral(true);
 
         for toggle in &selector.roles {
-            let button = toggle.try_as_button(http, true, guild).await?;
+            let button = toggle.as_button(http, true, guild).await?;
 
             message = message.button(button);
         }
@@ -207,12 +197,13 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         let mut message = CreateMessage::new().embed(embed);
 
         for toggle in &selector.roles {
-            let button = toggle.try_as_button(http, false, guild).await?;
+            let button = toggle.as_button(http, false, guild).await?;
 
             message = message.button(button);
         }
 
         cmd.channel_id.send_message(http, message).await?;
+        selector.remove(())?;
 
         let embed = CreateEmbed::new().color(BOT_COLOR).title("Sent selectors!");
         let message = CreateInteractionResponseMessage::new()

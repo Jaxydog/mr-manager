@@ -1,8 +1,7 @@
-use std::path::PathBuf;
-
-use tokio::{
+use std::{
     fs::{create_dir_all, remove_file, File},
-    io::AsyncWriteExt,
+    io::Write,
+    path::PathBuf,
 };
 
 use crate::prelude::*;
@@ -24,10 +23,11 @@ where
     pub const DIR: &str = "data";
     pub const EXT: &str = "rmp";
 
-    pub fn new(dir: impl Into<String>, key: impl Into<String>) -> Self {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(dir: impl ToString, key: impl ToString) -> Self {
         Self {
-            dir: dir.into(),
-            key: key.into(),
+            dir: dir.to_string(),
+            key: key.to_string(),
             _marker: PhantomData,
         }
     }
@@ -39,81 +39,93 @@ where
         self.dir().join(&self.key).with_extension(Self::EXT)
     }
 
-    pub async fn read(&self) -> Result<T> {
-        let file = File::open(self.path()).await?;
+    pub fn read(&self) -> Result<T> {
+        let file = File::open(self.path())?;
 
-        Ok(rmp_serde::from_read(file.into_std().await)?)
+        Ok(rmp_serde::from_read(file)?)
     }
-    pub async fn write(&self, val: &T) -> Result<()> {
-        create_dir_all(self.dir()).await?;
+    pub fn write(&self, value: &T) -> Result<()> {
+        create_dir_all(self.dir())?;
 
-        let raw = rmp_serde::to_vec(val)?;
-        let mut file = File::create(self.path()).await?;
+        let raw = rmp_serde::to_vec(value)?;
+        let mut file = File::create(self.path())?;
 
-        file.write_all(&raw).await.map_err(Error::from)
+        file.write_all(&raw).map_err(Error::from)
     }
-    pub async fn remove(&self) -> Result<()> {
-        remove_file(self.path()).await.map_err(Error::from)
-    }
-}
-
-pub trait TryNewReq: Send + Sync + Serialize + for<'de> Deserialize<'de> {
-    type Args: Send + Sync;
-
-    fn try_new_req(args: Self::Args) -> Result<Req<Self>>;
-}
-
-pub trait NewReq: Send + Sync + Serialize + for<'de> Deserialize<'de> {
-    type Args: Send + Sync;
-
-    fn new_req(args: Self::Args) -> Req<Self>;
-}
-
-impl<T: NewReq> TryNewReq for T {
-    type Args = <Self as NewReq>::Args;
-
-    fn try_new_req(args: Self::Args) -> Result<Req<Self>> {
-        Ok(Self::new_req(args))
+    pub fn remove(&self) -> Result<()> {
+        remove_file(self.path()).map_err(Error::from)
     }
 }
 
-pub trait TryAsReq: Send + Sync + Serialize + for<'de> Deserialize<'de> {
-    fn try_as_req(&self) -> Result<Req<Self>>;
-}
+pub trait TryNewReq<T>
+where
+    Self: Send + Sync + Serialize + for<'de> Deserialize<'de>,
+    T: Send + Sync,
+{
+    fn try_new_req(_: T) -> Result<Req<Self>>;
 
-pub trait AsReq: Send + Sync + Serialize + for<'de> Deserialize<'de> {
-    fn as_req(&self) -> Req<Self>;
-}
-
-impl<T: AsReq> TryAsReq for T {
-    fn try_as_req(&self) -> Result<Req<Self>> {
-        Ok(self.as_req())
+    fn try_read(value: T) -> Result<Self> {
+        Self::try_new_req(value)?.read()
     }
 }
 
-#[async_trait]
-pub trait ReadReq: TryNewReq {
-    async fn read(args: Self::Args) -> Result<Self> {
-        Self::try_new_req(args)?.read().await
+pub trait NewReq<T>
+where
+    Self: Send + Sync + Serialize + for<'de> Deserialize<'de>,
+    T: Send + Sync,
+{
+    fn new_req(_: T) -> Req<Self>;
+
+    fn read(value: T) -> Result<Self> {
+        Self::new_req(value).read()
     }
 }
 
-impl<T: TryNewReq> ReadReq for T {}
-
-#[async_trait]
-pub trait WriteReq: TryAsReq {
-    async fn write(&self) -> Result<()> {
-        self.try_as_req()?.write(self).await
+impl<T, A> TryNewReq<A> for T
+where
+    T: NewReq<A>,
+    A: Send + Sync,
+{
+    fn try_new_req(value: A) -> Result<Req<Self>> {
+        Ok(Self::new_req(value))
     }
 }
 
-impl<T: TryAsReq> WriteReq for T {}
+pub trait TryAsReq<T>
+where
+    Self: Send + Sync + Serialize + for<'de> Deserialize<'de>,
+    T: Send + Sync,
+{
+    fn try_as_req(&self, _: T) -> Result<Req<Self>>;
 
-#[async_trait]
-pub trait RemoveReq: TryAsReq {
-    async fn remove(self) -> Result<()> {
-        self.try_as_req()?.remove().await
+    fn try_write(&self, value: T) -> Result<()> {
+        self.try_as_req(value)?.write(self)
+    }
+    fn try_remove(self, value: T) -> Result<()> {
+        self.try_as_req(value)?.remove()
     }
 }
 
-impl<T: TryAsReq> RemoveReq for T {}
+pub trait AsReq<T>
+where
+    Self: Send + Sync + Serialize + for<'de> Deserialize<'de>,
+{
+    fn as_req(&self, _: T) -> Req<Self>;
+
+    fn write(&self, value: T) -> Result<()> {
+        self.as_req(value).write(self)
+    }
+    fn remove(self, value: T) -> Result<()> {
+        self.as_req(value).remove()
+    }
+}
+
+impl<T, A> TryAsReq<A> for T
+where
+    T: AsReq<A>,
+    A: Send + Sync,
+{
+    fn try_as_req(&self, value: A) -> Result<Req<Self>> {
+        Ok(self.as_req(value))
+    }
+}
