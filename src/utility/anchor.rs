@@ -27,34 +27,26 @@ impl Anchor {
     }
 }
 
-impl TryFrom<Message> for Anchor {
+impl TryFrom<(GuildId, Message)> for Anchor {
     type Error = Error;
 
-    fn try_from(value: Message) -> Result<Self> {
-        let Some(guild) = value.guild_id else {
-			return Err(Error::MissingId(Value::Guild))
-		};
-
+    fn try_from((guild, message): (GuildId, Message)) -> Result<Self> {
         Ok(Self {
             guild,
-            channel: value.channel_id,
-            message: value.id,
+            channel: message.channel_id,
+            message: message.id,
         })
     }
 }
 
-impl TryFrom<&Message> for Anchor {
+impl TryFrom<(GuildId, &Message)> for Anchor {
     type Error = Error;
 
-    fn try_from(value: &Message) -> Result<Self> {
-        let Some(guild) = value.guild_id else {
-			return Err(Error::MissingId(Value::Guild))
-		};
-
+    fn try_from((guild, message): (GuildId, &Message)) -> Result<Self> {
         Ok(Self {
             guild,
-            channel: value.channel_id,
-            message: value.id,
+            channel: message.channel_id,
+            message: message.id,
         })
     }
 }

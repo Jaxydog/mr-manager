@@ -61,7 +61,7 @@ impl Config {
         }
 
         let message = channel.send_message(http, builder).await?;
-        self.anchor = Some(Anchor::try_from(message)?);
+        self.anchor = Some(Anchor::try_from((guild, message))?);
         self.try_write(())
     }
 }

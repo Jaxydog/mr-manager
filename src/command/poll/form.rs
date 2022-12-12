@@ -204,7 +204,7 @@ impl Form {
 
         let builder = self.as_message(http, false).await?;
         let message = channel.send_message(http, builder).await?;
-        self.anchor = Some(Anchor::try_from(&message)?);
+        self.anchor = Some(Anchor::try_from((guild.id, &message))?);
         self.write(self.anchor()?.guild)?;
 
         let mut active = Active::read(()).unwrap_or_default();
