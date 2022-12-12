@@ -12,6 +12,7 @@ pub const SUB_CONFIG: &str = "config";
 pub const SUB_MODIFY: &str = "modify";
 pub const SUB_UPDATE: &str = "update";
 pub const SUB_REMOVE: &str = "remove";
+pub const SUB_VIEW: &str = "view";
 
 pub const OPTION_TITLE: &str = "title";
 pub const OPTION_DESCRIPTION: &str = "description";
@@ -274,6 +275,21 @@ pub fn new() -> CreateCommand {
                 .required(true),
             ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                SUB_VIEW,
+                "Views a member's submitted application",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::User,
+                    OPTION_USER,
+                    "The guild member that submitted the application",
+                )
+                .required(true),
+            ),
+        )
 }
 
 #[allow(clippy::too_many_lines)]
@@ -422,6 +438,18 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         let embed = CreateEmbed::new()
             .color(BOT_COLOR)
             .title("Removed user application!");
+        let message = CreateInteractionResponseMessage::new()
+            .embed(embed)
+            .ephemeral(true);
+
+        cmd.create_response(http, CreateInteractionResponse::Message(message))
+            .await
+            .map_err(Error::from)
+    } else if let Ok(o) = get_subcommand(o, SUB_VIEW) {
+        let (user, _) = get_user(o, OPTION_USER)?;
+        let form = Form::read((guild, user.id))?;
+
+        let embed = form.as_embed(http, guild).await?;
         let message = CreateInteractionResponseMessage::new()
             .embed(embed)
             .ephemeral(true);
