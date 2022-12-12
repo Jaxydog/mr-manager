@@ -57,9 +57,13 @@ impl ChoiceOutputData {
             votes as f64 / total as f64
         }
     }
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss
+    )]
     fn __graph(percent: f64, width: usize) -> String {
-        let size = width * percent as usize;
+        let size = (width as f64 * percent) as usize;
         let fill = Self::BAR_FILL.repeat(size);
         let none = Self::BAR_NONE.repeat(width - size);
 
@@ -373,11 +377,11 @@ impl AsButtonVec<(UserId, MessageId, usize)> for Output {
         let last = CreateButton::new(CustomId::new(BUTTON_LAST).arg(user).arg(message).arg(page))
             .disabled(disabled)
             .emoji('⬅')
-            .style(ButtonStyle::Primary);
+            .style(ButtonStyle::Secondary);
         let next = CreateButton::new(CustomId::new(BUTTON_NEXT).arg(user).arg(message).arg(page))
             .disabled(disabled)
             .emoji('➡')
-            .style(ButtonStyle::Primary);
+            .style(ButtonStyle::Secondary);
 
         vec![last, next]
     }

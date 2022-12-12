@@ -367,7 +367,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         if form.is_anchored() {
             return Err(Error::Other("Your poll has already been sent"));
         }
-        if form.inputs.is_empty() {
+        if form.kind != Kind::Raffle && form.inputs.is_empty() {
             return Err(Error::Other("Your poll does not have any inputs"));
         }
         if form.kind == Kind::Choice && form.inputs.len() <= 1 {
