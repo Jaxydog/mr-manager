@@ -41,6 +41,7 @@ impl ChoiceOutputData {
         }
 
         votes.sort_by_key(BTreeSet::len);
+        votes.reverse();
 
         Self { votes }
     }
