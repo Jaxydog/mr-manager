@@ -768,15 +768,18 @@ pub async fn run_modal(http: &Http, mdl: &ModalInteraction) -> Result<()> {
 }
 
 pub async fn check(http: &Http) -> Result<()> {
-    let Ok(active) = Active::read(()) else {
+    let Ok(mut active) = Active::read(()) else {
         return Ok(());
     };
+    let mut invalid = vec![];
 
     for key in &active.0 {
         let Ok(form) = Form::read(*key) else {
+            invalid.push(*key);
             continue;
         };
         let Ok(anchor) = form.anchor() else {
+            invalid.push(*key);
             continue;
         };
 
@@ -786,6 +789,14 @@ pub async fn check(http: &Http) -> Result<()> {
         if Utc::now().timestamp_millis() >= sent + duration {
             form.close(http).await?;
         }
+    }
+
+    if !invalid.is_empty() {
+        for key in invalid {
+            active.0.remove(&key);
+        }
+
+        active.write(())?;
     }
 
     Ok(())

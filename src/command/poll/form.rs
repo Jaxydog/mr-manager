@@ -157,9 +157,8 @@ impl Form {
     }
     pub async fn as_results_embed(&self, http: &Http) -> Result<CreateEmbed> {
         let user = http.get_user(self.user).await?;
-        let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
         let color = user.accent_colour.unwrap_or(BOT_COLOR);
-        let mut builder = CreateEmbed::new().author(author).color(color);
+        let mut builder = CreateEmbed::new().color(color).title("Poll Results");
 
         if let Ok(anchor) = self.anchor() {
             builder = builder.url(anchor.to_string());
@@ -322,13 +321,13 @@ impl AsEmbedAsync<()> for Form {
         let members = if self.content.hide_members {
             "*Members are hidden*"
         } else {
-            "*Members are NOT hidden*"
+            "*Members are shown*"
         };
 
         let results = if self.content.hide_results {
             "*Results are hidden*"
         } else {
-            "*Results are NOT hidden*"
+            "*Results are shown*"
         };
 
         let mut description = format!("**Type:** {}\n", self.kind);

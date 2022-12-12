@@ -40,6 +40,8 @@ impl ChoiceOutputData {
             votes.push(users);
         }
 
+        votes.sort_by_key(BTreeSet::len);
+
         Self { votes }
     }
 
@@ -81,7 +83,7 @@ impl ChoiceOutputData {
             let graph = Self::__graph(percent, 10);
             let votes = format!("{} votes ({:.1}%)", users.len(), percent * 100.0);
 
-            description.push_str(&format!("{graph} {} - {votes}\n", data.label));
+            description.push_str(&format!("{graph} **{}** - {votes}\n", data.label));
         }
 
         let embed = CreateEmbed::new()
@@ -242,8 +244,9 @@ impl ResponseOutputData {
             let Some(Input::Response(data)) = form.inputs.get(index) else {
 				continue;
 			};
+            let answer = answer.replace(['\n', '\r', '\t'], " ");
 
-            embed = embed.field(&data.label, answer, false);
+            embed = embed.field(&data.label, format!("> {answer}"), false);
         }
 
         if let Ok(anchor) = form.anchor() {
