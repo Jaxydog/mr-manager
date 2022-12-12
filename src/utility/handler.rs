@@ -100,7 +100,7 @@ impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, mut int: Interaction) {
         let id = match &int {
             Interaction::Autocomplete(i) | Interaction::Command(i) => {
-                format!("{}#{}", i.data.name, i.id)
+                format!("{}.{}", i.data.name, i.id)
             }
             Interaction::Component(i) => format!("{}.{}", i.data.custom_id, i.id),
             Interaction::Modal(i) => format!("{}.{}", i.data.custom_id, i.id),

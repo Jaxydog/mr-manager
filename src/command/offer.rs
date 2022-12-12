@@ -2,9 +2,9 @@ use crate::prelude::*;
 
 pub const NAME: &str = "offer";
 
-pub const OP_OFFER: &str = "offer";
-pub const OP_PRICE: &str = "price";
-pub const OP_MINUTES: &str = "minutes";
+pub const OPTION_OFFER: &str = "offer";
+pub const OPTION_PRICE: &str = "price";
+pub const OPTION_MINUTES: &str = "minutes";
 
 pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
@@ -14,7 +14,7 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_OFFER,
+                OPTION_OFFER,
                 "What are you giving away?",
             )
             .max_length(256)
@@ -24,7 +24,7 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_PRICE,
+                OPTION_PRICE,
                 "What do you want in return?",
             )
             .max_length(256)
@@ -34,7 +34,7 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::Integer,
-                OP_MINUTES,
+                OPTION_MINUTES,
                 "For how long is this valid?",
             )
             .max_int_value(14400)
@@ -47,9 +47,9 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let user = http.get_user(cmd.user.id).await?;
 
     let o = &cmd.data.options();
-    let offer = get_str(o, OP_OFFER)?;
-    let price = get_str(o, OP_PRICE)?;
-    let minutes = get_i64(o, OP_MINUTES)?;
+    let offer = get_str(o, OPTION_OFFER)?;
+    let price = get_str(o, OPTION_PRICE)?;
+    let minutes = get_i64(o, OPTION_MINUTES)?;
 
     let time = TimeString::new(Utc::now().timestamp_millis() + (minutes * 60 * 1000));
     let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());

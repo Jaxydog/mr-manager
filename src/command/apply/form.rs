@@ -2,13 +2,13 @@ use rand::{thread_rng, Rng};
 
 use super::*;
 
-pub const OP_REASON: &str = "reason";
+pub const OPTION_REASON: &str = "reason";
 
-pub const CM_ACCEPT: &str = formatcp!("{NAME}_accept");
-pub const CM_DENY: &str = formatcp!("{NAME}_deny");
-pub const CM_RESEND: &str = formatcp!("{NAME}_resend");
+pub const BUTTON_ACCEPT: &str = formatcp!("{NAME}_accept");
+pub const BUTTON_DENY: &str = formatcp!("{NAME}_deny");
+pub const BUTTON_RESEND: &str = formatcp!("{NAME}_resend");
 
-pub const MD_UPDATE: &str = formatcp!("{NAME}_update");
+pub const MODAL_UPDATE: &str = formatcp!("{NAME}_update");
 
 pub const TOAST: [&str; 8] = [
     "I spot a new member!",
@@ -238,17 +238,17 @@ impl AsEmbedAsync<GuildId> for Form {
 
 impl AsButtonVec<()> for Form {
     fn as_buttons(&self, disabled: bool, _: ()) -> Vec<CreateButton> {
-        let accept = CreateButton::new(CustomId::new(CM_ACCEPT).arg(self.user.to_string()))
+        let accept = CreateButton::new(CustomId::new(BUTTON_ACCEPT).arg(self.user.to_string()))
             .disabled(disabled)
             .emoji('👍')
             .label("Accept")
             .style(ButtonStyle::Success);
-        let deny = CreateButton::new(CustomId::new(CM_DENY).arg(self.user.to_string()))
+        let deny = CreateButton::new(CustomId::new(BUTTON_DENY).arg(self.user.to_string()))
             .disabled(disabled)
             .emoji('👎')
             .label("Deny")
             .style(ButtonStyle::Danger);
-        let resend = CreateButton::new(CustomId::new(CM_RESEND).arg(self.user.to_string()))
+        let resend = CreateButton::new(CustomId::new(BUTTON_RESEND).arg(self.user.to_string()))
             .disabled(disabled)
             .emoji('🤷')
             .label("Resend")
@@ -260,13 +260,13 @@ impl AsButtonVec<()> for Form {
 
 impl AsModal<Status> for Form {
     fn as_modal(&self, status: Status) -> CreateModal {
-        let custom_id = CustomId::new(MD_UPDATE)
+        let custom_id = CustomId::new(MODAL_UPDATE)
             .arg(self.user.to_string())
             .arg((status as u8).to_string());
 
         let modal = CreateModal::new(custom_id, "Update Application");
         let components = vec![CreateActionRow::InputText(
-            CreateInputText::new(InputTextStyle::Short, "Reason (optional)", OP_REASON)
+            CreateInputText::new(InputTextStyle::Short, "Reason (optional)", OPTION_REASON)
                 .max_length(256)
                 .required(false),
         )];

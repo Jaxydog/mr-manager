@@ -2,18 +2,18 @@ use crate::prelude::*;
 
 pub const NAME: &str = "embed";
 
-pub const OP_AUTHOR_ICON: &str = "author_icon";
-pub const OP_AUTHOR_LINK: &str = "author_link";
-pub const OP_AUTHOR_NAME: &str = "author_name";
-pub const OP_EMBED_COLOR: &str = "color";
-pub const OP_DESCRIPTION: &str = "description";
-pub const OP_FOOTER_ICON: &str = "footer_icon";
-pub const OP_FOOTER_TEXT: &str = "footer_text";
-pub const OP_IMAGE_LINK: &str = "image_link";
-pub const OP_THUMB_LINK: &str = "thumbnail_link";
-pub const OP_TITLE_TEXT: &str = "title_text";
-pub const OP_TITLE_LINK: &str = "title_link";
-pub const OP_EPHEMERAL: &str = "ephemeral";
+pub const OPTION_AUTHOR_ICON: &str = "author_icon";
+pub const OPTION_AUTHOR_LINK: &str = "author_link";
+pub const OPTION_AUTHOR_NAME: &str = "author_name";
+pub const OPTION_EMBED_COLOR: &str = "color";
+pub const OPTION_DESCRIPTION: &str = "description";
+pub const OPTION_FOOTER_ICON: &str = "footer_icon";
+pub const OPTION_FOOTER_TEXT: &str = "footer_text";
+pub const OPTION_IMAGE_LINK: &str = "image_link";
+pub const OPTION_THUMB_LINK: &str = "thumbnail_link";
+pub const OPTION_TITLE_TEXT: &str = "title_text";
+pub const OPTION_TITLE_LINK: &str = "title_link";
+pub const OPTION_EPHEMERAL: &str = "ephemeral";
 
 #[allow(clippy::too_many_lines)]
 pub fn new() -> CreateCommand {
@@ -23,18 +23,18 @@ pub fn new() -> CreateCommand {
         .dm_permission(false)
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            OP_AUTHOR_ICON,
+            OPTION_AUTHOR_ICON,
             "The embed author's icon link",
         ))
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            OP_AUTHOR_LINK,
+            OPTION_AUTHOR_LINK,
             "The embed author's link",
         ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_AUTHOR_NAME,
+                OPTION_AUTHOR_NAME,
                 "The embed author's name",
             )
             .max_length(256)
@@ -43,7 +43,7 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_EMBED_COLOR,
+                OPTION_EMBED_COLOR,
                 "The embed's color",
             )
             .add_string_choice("Default", BOT_COLOR.hex())
@@ -72,7 +72,7 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_DESCRIPTION,
+                OPTION_DESCRIPTION,
                 "The embed's description (supports newline and markdown)",
             )
             .max_length(4096)
@@ -80,13 +80,13 @@ pub fn new() -> CreateCommand {
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            OP_FOOTER_ICON,
+            OPTION_FOOTER_ICON,
             "The embed footer's icon link",
         ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_FOOTER_TEXT,
+                OPTION_FOOTER_TEXT,
                 "The embed footer's text",
             )
             .max_length(2048)
@@ -94,23 +94,23 @@ pub fn new() -> CreateCommand {
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            OP_IMAGE_LINK,
+            OPTION_IMAGE_LINK,
             "The embed's image link",
         ))
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            OP_THUMB_LINK,
+            OPTION_THUMB_LINK,
             "The embed's thumbnail link",
         ))
         .add_option(CreateCommandOption::new(
             CommandOptionType::String,
-            OP_TITLE_LINK,
+            OPTION_TITLE_LINK,
             "The embed title's link",
         ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_TITLE_TEXT,
+                OPTION_TITLE_TEXT,
                 "The embed title's text",
             )
             .max_length(2048)
@@ -118,7 +118,7 @@ pub fn new() -> CreateCommand {
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::Boolean,
-            OP_EPHEMERAL,
+            OPTION_EPHEMERAL,
             "Whether the embed is ephemeral (only visible to you)",
         ))
 }
@@ -129,13 +129,13 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let mut count = 0;
     let mut valid = false;
 
-    if let Ok(name) = get_str(o, OP_AUTHOR_NAME) {
+    if let Ok(name) = get_str(o, OPTION_AUTHOR_NAME) {
         let mut author = CreateEmbedAuthor::new(name);
 
-        if let Ok(icon_url) = get_str(o, OP_AUTHOR_ICON) {
+        if let Ok(icon_url) = get_str(o, OPTION_AUTHOR_ICON) {
             author = author.icon_url(icon_url);
         }
-        if let Ok(url) = get_str(o, OP_AUTHOR_LINK) {
+        if let Ok(url) = get_str(o, OPTION_AUTHOR_LINK) {
             author = author.url(url);
         }
 
@@ -144,7 +144,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         valid = true;
     }
 
-    if let Ok(hex) = get_str(o, OP_EMBED_COLOR) {
+    if let Ok(hex) = get_str(o, OPTION_EMBED_COLOR) {
         let color = if hex.is_empty() {
             let user = http.get_user(cmd.user.id).await?;
 
@@ -156,7 +156,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         embed = embed.color(color.unwrap_or(BOT_COLOR));
     }
 
-    if let Ok(description) = get_str(o, OP_DESCRIPTION) {
+    if let Ok(description) = get_str(o, OPTION_DESCRIPTION) {
         let description = description.replace(r"\n", "\n");
 
         embed = embed.description(description.trim());
@@ -164,10 +164,10 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         valid = true;
     }
 
-    if let Ok(text) = get_str(o, OP_FOOTER_TEXT) {
+    if let Ok(text) = get_str(o, OPTION_FOOTER_TEXT) {
         let mut footer = CreateEmbedFooter::new(text);
 
-        if let Ok(icon_url) = get_str(o, OP_FOOTER_ICON) {
+        if let Ok(icon_url) = get_str(o, OPTION_FOOTER_ICON) {
             footer = footer.icon_url(icon_url);
         }
 
@@ -176,18 +176,18 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         valid = true;
     }
 
-    if let Ok(url) = get_str(o, OP_IMAGE_LINK) {
+    if let Ok(url) = get_str(o, OPTION_IMAGE_LINK) {
         embed = embed.image(url);
         valid = true;
     }
 
-    if let Ok(url) = get_str(o, OP_THUMB_LINK) {
+    if let Ok(url) = get_str(o, OPTION_THUMB_LINK) {
         embed = embed.thumbnail(url);
         valid = true;
     }
 
-    if let Ok(title) = get_str(o, OP_TITLE_TEXT) {
-        if let Ok(url) = get_str(o, OP_TITLE_LINK) {
+    if let Ok(title) = get_str(o, OPTION_TITLE_TEXT) {
+        if let Ok(url) = get_str(o, OPTION_TITLE_LINK) {
             embed = embed.url(url);
         }
 
@@ -203,7 +203,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         return Err(Error::Other("Content must have at most 6000 characters"));
     }
 
-    let ephemeral = get_bool(o, OP_EPHEMERAL).unwrap_or_default();
+    let ephemeral = get_bool(o, OPTION_EPHEMERAL).unwrap_or_default();
     let message = CreateInteractionResponseMessage::new()
         .embed(embed)
         .ephemeral(ephemeral);

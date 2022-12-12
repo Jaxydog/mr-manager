@@ -84,3 +84,20 @@ impl<T: AsModal<A>, A> TryAsModal<A> for T {
         Ok(self.as_modal(value))
     }
 }
+
+pub trait TryAsInputText<T> {
+    fn try_as_input_text(&self, _: T) -> Result<CreateInputText>;
+}
+pub trait AsInputText<T> {
+    fn as_input_text(&self, _: T) -> CreateInputText;
+}
+#[async_trait]
+pub trait AsInputTextAsync<T: Send + Sync> {
+    async fn as_input_text(&self, http: &Http, _: T) -> Result<CreateInputText>;
+}
+
+impl<T: AsInputText<A>, A> TryAsInputText<A> for T {
+    fn try_as_input_text(&self, value: A) -> Result<CreateInputText> {
+        Ok(self.as_input_text(value))
+    }
+}

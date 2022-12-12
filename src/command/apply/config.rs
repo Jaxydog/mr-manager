@@ -1,9 +1,9 @@
 use super::*;
 
-pub const CM_MODAL: &str = formatcp!("{NAME}_modal");
-pub const CM_ABOUT: &str = formatcp!("{NAME}_about");
+pub const BUTTON_MODAL: &str = formatcp!("{NAME}_modal");
+pub const BUTTON_ABOUT: &str = formatcp!("{NAME}_about");
 
-pub const MD_SUBMIT: &str = formatcp!("{NAME}_submit");
+pub const MODAL_SUBMIT: &str = formatcp!("{NAME}_submit");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Content {
@@ -74,7 +74,7 @@ impl Anchored for Config {
 
 impl NewReq<GuildId> for Config {
     fn new_req(guild: GuildId) -> Req<Self> {
-        Req::new(format!("{NAME}/{guild}"), ".cfg")
+        Req::new(format!("{NAME}/{guild}"), ".dat")
     }
 }
 
@@ -113,12 +113,12 @@ impl AsEmbedAsync<GuildId> for Config {
 
 impl AsButtonVec<()> for Config {
     fn as_buttons(&self, disabled: bool, _: ()) -> Vec<CreateButton> {
-        let modal = CreateButton::new(CM_MODAL)
+        let modal = CreateButton::new(BUTTON_MODAL)
             .disabled(disabled)
             .emoji('👋')
             .label("Apply to Guild")
             .style(ButtonStyle::Primary);
-        let about = CreateButton::new(CM_ABOUT)
+        let about = CreateButton::new(BUTTON_ABOUT)
             .disabled(disabled)
             .emoji('ℹ')
             .label("About Applications")
@@ -130,7 +130,7 @@ impl AsButtonVec<()> for Config {
 
 impl AsModal<()> for Config {
     fn as_modal(&self, _: ()) -> CreateModal {
-        let modal = CreateModal::new(MD_SUBMIT, "Apply to Guild");
+        let modal = CreateModal::new(MODAL_SUBMIT, "Apply to Guild");
         let mut components = vec![];
 
         for (index, question) in self.content.questions.iter().enumerate() {

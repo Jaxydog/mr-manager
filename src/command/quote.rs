@@ -2,8 +2,8 @@ use crate::prelude::*;
 
 pub const NAME: &str = "quote";
 
-pub const OP_USER: &str = "user";
-pub const OP_TEXT: &str = "text";
+pub const OPTION_USER: &str = "user";
+pub const OPTION_TEXT: &str = "text";
 
 pub fn new() -> CreateCommand {
     CreateCommand::new(NAME)
@@ -11,11 +11,11 @@ pub fn new() -> CreateCommand {
         .description("Quote something that a user said!")
         .dm_permission(false)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, OP_USER, "Who said it?")
+            CreateCommandOption::new(CommandOptionType::User, OPTION_USER, "Who said it?")
                 .required(true),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, OP_TEXT, "What did they say?")
+            CreateCommandOption::new(CommandOptionType::String, OPTION_TEXT, "What did they say?")
                 .max_length(256)
                 .clone()
                 .required(true),
@@ -25,7 +25,7 @@ pub fn new() -> CreateCommand {
 pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let o = &cmd.data.options();
 
-    let user = get_user(o, OP_USER)?;
+    let user = get_user(o, OPTION_USER)?;
     let user = http.get_user(user.0.id).await?;
 
     if user == cmd.user {
@@ -35,7 +35,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         return Err(Error::Other("You cannot quote a bot"));
     }
 
-    let text = get_str(o, OP_TEXT)?;
+    let text = get_str(o, OPTION_TEXT)?;
 
     let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
     let embed = CreateEmbed::new()

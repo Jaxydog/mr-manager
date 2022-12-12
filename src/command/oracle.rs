@@ -4,7 +4,7 @@ use crate::prelude::*;
 
 pub const NAME: &str = "oracle";
 
-pub const OP_QUESTION: &str = "question";
+pub const OPTION_QUESTION: &str = "question";
 
 pub const ANSWERS: [Reply; 20] = [
     Reply::new(Mood::Good, "It is certain."),
@@ -78,7 +78,7 @@ pub fn new() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
-                OP_QUESTION,
+                OPTION_QUESTION,
                 "What would you like to ask?",
             )
             .max_length(512)
@@ -90,7 +90,7 @@ pub fn new() -> CreateCommand {
 pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let name = cmd.user.id.to_user(http).await?.tag();
     let o = &cmd.data.options();
-    let query = get_str(o, OP_QUESTION)?;
+    let query = get_str(o, OPTION_QUESTION)?;
 
     let index = thread_rng().gen_range(0..ANSWERS.len());
     let reply = ANSWERS[index];
