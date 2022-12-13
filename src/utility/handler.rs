@@ -107,10 +107,8 @@ impl EventHandler for Handler {
             Interaction::Ping(i) => format!("{}.{}", i.token, i.id),
         };
         let name = format!("{:?}<{id}>", int.kind());
-
-        self.info(format!("Received: {name}"));
-
         let http = &ctx.http;
+
         let result: Result<()> = match &mut int {
             Interaction::Command(i) => match i.data.name.as_str() {
                 apply::NAME => apply::run_command(http, i).await,
