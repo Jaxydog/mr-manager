@@ -656,13 +656,13 @@ pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Resul
             };
             let message = MessageId::new(message);
 
-            let form = Form::read((guild, user, message))?;
+            let mut form = Form::read((guild, user, message))?;
 
             if form.content.hide_results && cpn.user.id != user {
                 return Err(Error::Other("The results of this poll are private"));
             };
 
-            let output = form.output()?.clone();
+            let output = form.output().clone();
             let builder = output.as_embed(http, (form, 1)).await?;
             let mut builder = CreateInteractionResponseMessage::new()
                 .embed(builder)
@@ -705,13 +705,13 @@ pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Resul
                 _ => return Err(Error::InvalidId(Value::Component, custom_id.name)),
             };
 
-            let form = Form::read((guild, user, message))?;
+            let mut form = Form::read((guild, user, message))?;
 
             if form.content.hide_results && cpn.user.id != user {
                 return Err(Error::Other("The results of this poll are private"));
             };
 
-            let output = form.output()?.clone();
+            let output = form.output().clone();
             let builder = output.as_embed(http, (form, page)).await?;
             let mut builder = CreateInteractionResponseMessage::new()
                 .embed(builder)

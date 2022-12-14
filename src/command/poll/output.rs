@@ -9,7 +9,8 @@ pub const BUTTON_NEXT: &str = formatcp!("{NAME}_next");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChoiceOutputData {
-    pub votes: Vec<BTreeSet<UserId>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub votes: Vec<(usize, BTreeSet<UserId>)>,
 }
 
 impl ChoiceOutputData {
@@ -37,10 +38,10 @@ impl ChoiceOutputData {
                 users.insert(*user);
             }
 
-            votes.push(users);
+            votes.push((index, users));
         }
 
-        votes.sort_by_key(BTreeSet::len);
+        votes.sort_by_key(|(_, users)| users.len());
         votes.reverse();
 
         Self { votes }
@@ -79,8 +80,8 @@ impl ChoiceOutputData {
         let footer = CreateEmbedFooter::new(format!("Page 1 / {}", self.pages()));
         let mut description = format!("**Total Votes:** {total}\n\n");
 
-        for (index, users) in self.votes.iter().enumerate() {
-            let Some(Input::Choice(data)) = form.inputs.get(index) else {
+        for (index, users) in &self.votes {
+            let Some(Input::Choice(data)) = form.inputs.get(*index) else {
 				continue;
 			};
 
@@ -108,10 +109,10 @@ impl ChoiceOutputData {
     async fn __specific(&self, http: &Http, form: Form, page: usize) -> Result<CreateEmbed> {
         let index = page.saturating_sub(2);
 
-        let Some(users) = self.votes.get(index) else {
+        let Some((index, users)) = self.votes.get(index) else {
 			return Err(Error::MissingValue(Value::Other("Entry")));
 		};
-        let Some(Input::Choice(data)) = form.inputs.get(index) else {
+        let Some(Input::Choice(data)) = form.inputs.get(*index) else {
 			return Err(Error::MissingValue(Value::Other("Input")));
 		};
 
@@ -164,6 +165,7 @@ impl AsEmbedAsync<(Form, usize)> for ChoiceOutputData {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResponseOutputData {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub answers: BTreeMap<UserId, Vec<String>>,
 }
 
@@ -275,13 +277,18 @@ impl AsEmbedAsync<(Form, usize)> for ResponseOutputData {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RaffleOutputData {
-    pub winner: UserId,
+    pub winner: Option<UserId>,
 }
 
 impl RaffleOutputData {
     pub fn new(form: &Form) -> Self {
         let users = form.replies.keys().copied().collect::<Vec<_>>();
-        let winner = users[thread_rng().gen_range(0..users.len())];
+        let winner = (!users.is_empty())
+            .then(|| {
+                let index = thread_rng().gen_range(0..users.len());
+                users.get(index).copied()
+            })
+            .flatten();
 
         Self { winner }
     }
@@ -301,7 +308,10 @@ impl AsEmbedAsync<Form> for RaffleOutputData {
         let footer = CreateEmbedFooter::new("Page 1 / 1");
 
         let total = format!("**Total Entries:** {}", form.replies.len());
-        let winner = format!("**Winner:** <@{}>", self.winner);
+        let winner = self.winner.map_or_else(
+            || "**Winner:** *No responses*".to_string(),
+            |winner| format!("**Winner:** <@{winner}>"),
+        );
         let users = if form.content.hide_members {
             "*Users are hidden*".to_string()
         } else if form.replies.is_empty() {
