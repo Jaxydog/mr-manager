@@ -762,7 +762,14 @@ pub async fn run_modal(http: &Http, mdl: &ModalInteraction) -> Result<()> {
     form.replies.insert(mdl.user.id, Reply::Response(answers));
     form.write(guild)?;
 
-    mdl.create_response(http, CreateInteractionResponse::Acknowledge)
+    let builder = CreateEmbed::new()
+        .color(BOT_COLOR)
+        .title("Your response has been recorded");
+    let builder = CreateInteractionResponseMessage::new()
+        .embed(builder)
+        .ephemeral(true);
+
+    mdl.create_response(http, CreateInteractionResponse::Message(builder))
         .await
         .map_err(Error::from)
 }
