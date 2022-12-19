@@ -20,7 +20,7 @@ fn __get_any<'c>(o: &'c [ResolvedOption<'c>], n: &'c str) -> Result<&'c Resolved
 }
 
 macro_rules! get {
-    ($name:ident; $kind:path => <$gives:ty>) => {
+    ($name:ident; $kind:path => $gives:ty) => {
         #[allow(dead_code)]
         pub fn $name<'c>(o: &'c [ResolvedOption<'c>], n: &'c str) -> Result<$gives> {
             match __get_any(o, n)? {
@@ -29,7 +29,7 @@ macro_rules! get {
             }
         }
     };
-    ($name:ident; $kind:path => $gives:ty) => {
+    ($name:ident; $kind:path => ref $gives:ty) => {
         #[allow(dead_code)]
         pub fn $name<'c>(o: &'c [ResolvedOption<'c>], n: &'c str) -> Result<&'c $gives> {
             match __get_any(o, n)? {
@@ -40,14 +40,14 @@ macro_rules! get {
     };
 }
 
-get!(get_bool; ResolvedValue::Boolean => <bool>);
-get!(get_channel; ResolvedValue::Channel => PartialChannel);
-get!(get_i64; ResolvedValue::Integer => <i64>);
-get!(get_f64; ResolvedValue::Number => <f64>);
-get!(get_role; ResolvedValue::Role => Role);
-get!(get_str; ResolvedValue::String => str);
-get!(get_subcommand; ResolvedValue::SubCommand => [ResolvedOption<'c>]);
-get!(get_subcommand_group; ResolvedValue::SubCommandGroup => [ResolvedOption<'c>]);
+get!(get_bool; ResolvedValue::Boolean => bool);
+get!(get_channel; ResolvedValue::Channel => ref PartialChannel);
+get!(get_i64; ResolvedValue::Integer => i64);
+get!(get_f64; ResolvedValue::Number => f64);
+get!(get_role; ResolvedValue::Role => ref Role);
+get!(get_str; ResolvedValue::String => ref str);
+get!(get_subcommand; ResolvedValue::SubCommand => ref [ResolvedOption<'c>]);
+get!(get_subcommand_group; ResolvedValue::SubCommandGroup => ref [ResolvedOption<'c>]);
 
 pub fn get_user<'c>(
     o: &'c [ResolvedOption<'c>],

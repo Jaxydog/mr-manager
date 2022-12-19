@@ -544,9 +544,7 @@ pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Resul
                 return Err(Error::InvalidId(Value::Data, index.clone()));
             };
 
-            dbg!("here");
             let mut form = Form::read((guild, user))?;
-            dbg!("after load");
 
             if user == cpn.user.id {
                 return Err(Error::Other("You cannot respond to your own poll"));
