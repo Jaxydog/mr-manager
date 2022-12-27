@@ -488,7 +488,7 @@ pub async fn run_component(http: &Http, cpn: &mut ComponentInteraction) -> Resul
             let embed = CreateEmbed::new()
                 .author(author)
                 .color(BOT_COLOR)
-                .description(include_str!(r"..\include\apply\about.txt"))
+                .description(include_str!(r"../include/apply/about.txt"))
                 .title("About Guild Applications");
 
             let message = CreateInteractionResponseMessage::new()

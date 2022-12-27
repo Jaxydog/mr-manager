@@ -15,7 +15,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let embed = CreateEmbed::new()
         .author(author)
         .color(BOT_COLOR)
-        .description(include_str!(r"..\include\data.txt"))
+        .description(include_str!(r"../include/data.txt"))
         .title("Data Usage and Privacy");
     let message = CreateInteractionResponseMessage::new()
         .embed(embed)

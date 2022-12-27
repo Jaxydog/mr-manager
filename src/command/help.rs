@@ -12,7 +12,7 @@ pub fn new() -> CreateCommand {
 pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
     let user = http.get_current_user().await?;
     let mut commands = http.get_global_application_commands().await?;
-    let mut description = include_str!(r"..\include\help\start.txt").to_string();
+    let mut description = include_str!(r"../include/help/start.txt").to_string();
 
     if commands.is_empty() {
         description.push_str("\n*No global commands found...*\n");
@@ -31,7 +31,7 @@ pub async fn run_command(http: &Http, cmd: &CommandInteraction) -> Result<()> {
         description.push('\n');
     }
 
-    description.push_str(include_str!(r"..\include\help\end.txt"));
+    description.push_str(include_str!(r"../include/help/end.txt"));
 
     let author = CreateEmbedAuthor::new(user.tag()).icon_url(user.face());
     let embed = CreateEmbed::new()

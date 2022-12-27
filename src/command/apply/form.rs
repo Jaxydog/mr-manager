@@ -111,9 +111,9 @@ impl Form {
         }
 
         let mut description = match self.status {
-            Status::Accepted => include_str!(r"..\..\include\apply\accept.txt"),
-            Status::Denied => include_str!(r"..\..\include\apply\deny.txt"),
-            Status::Resend => include_str!(r"..\..\include\apply\resend.txt"),
+            Status::Accepted => include_str!(r"../../include/apply/accept.txt"),
+            Status::Denied => include_str!(r"../../include/apply/deny.txt"),
+            Status::Resend => include_str!(r"../../include/apply/resend.txt"),
             s => return Err(Error::InvalidValue(Value::Other("Status"), s.to_string())),
         }
         .to_string();
