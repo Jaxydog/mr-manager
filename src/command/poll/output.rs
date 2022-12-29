@@ -127,7 +127,7 @@ impl ChoiceOutputData {
         let votes = format!("{} votes ({:.1}%)", users.len(), percent * 100.0);
         let users = if form.content.hide_members {
             "*Users are hidden*".to_string()
-        } else if form.replies.is_empty() {
+        } else if users.is_empty() {
             "*No responses*".to_string()
         } else {
             users
